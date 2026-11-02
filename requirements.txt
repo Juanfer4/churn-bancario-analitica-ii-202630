@@ -1,0 +1,17 @@
+# Entorno del proyecto: Python 3.11 (PyCaret 3.3.2 declara soporte para Python 3.9 a 3.11).
+# Versiones resueltas e importadas sin errores el 2026-10-22 en Linux con Python 3.11.17 y
+# usadas en la ejecución de referencia en Windows (computador de Juanfer).
+# Las versiones de pandas, numpy, scipy, joblib y matplotlib quedan limitadas por PyCaret 3.3.2.
+pandas==2.1.4
+numpy==1.26.4
+scipy==1.11.4
+scikit-learn==1.4.2
+imbalanced-learn==0.14.2
+lightgbm==4.7.0
+xgboost==3.2.0
+pycaret==3.3.2
+matplotlib==3.7.5
+openpyxl==3.1.5
+joblib==1.3.2
+ipykernel==7.4.0
+pytest==9.1.1

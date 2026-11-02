@@ -1,0 +1,6 @@
+variante,variables_quitadas,auc_cv,auc_cv_desv,diferencia_vs_completo,diferencia_desv,pliegues_por_debajo,churners_10,captura_10,precision_10,churners_20,captura_20,precision_20
+completo,ninguna,0.994148,0.001141,0.0,0.0,0,799.0,0.613671,0.98642,1269.0,0.974654,0.783333
+sin contactos,contacts_count_12_mon,0.993597,0.001476,-0.000551,0.000551,4,798.0,0.612903,0.985185,1268.0,0.973886,0.782716
+sin sexo,gender,0.99413,0.00113,-1.8e-05,0.000199,2,799.0,0.613671,0.98642,1272.0,0.976959,0.785185
+sin sexo ni ingresos,"gender, income_category",0.993903,0.001138,-0.000245,0.000168,5,799.0,0.613671,0.98642,1271.0,0.97619,0.784568
+sin sexo ni contactos,"gender, contacts_count_12_mon",0.993518,0.001322,-0.00063,0.000392,4,799.0,0.613671,0.98642,1272.0,0.976959,0.785185

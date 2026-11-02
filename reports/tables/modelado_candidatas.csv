@@ -1,0 +1,33 @@
+modelo,combinacion,auc_cv,auc_cv_desv,mejora_media,mejora_desv,pliegues_que_mejoran
+Regresión logística,base,0.937708,0.005607,0.0,0.0,0
+Regresión logística,+ ticket,0.942715,0.005175,0.005007,0.001903,5
+Regresión logística,+ saldo,0.94685,0.003132,0.009143,0.004702,5
+Regresión logística,+ ticket + saldo,0.950732,0.002137,0.013024,0.004316,5
+SVM (kernel RBF),base,0.967348,0.003183,0.0,0.0,0
+SVM (kernel RBF),+ ticket,0.971166,0.002794,0.003819,0.000447,5
+SVM (kernel RBF),+ saldo,0.968177,0.003315,0.000829,0.00196,3
+SVM (kernel RBF),+ ticket + saldo,0.972026,0.002933,0.004679,0.002295,5
+Red neuronal (MLP),base,0.96349,0.004636,0.0,0.0,0
+Red neuronal (MLP),+ ticket,0.962616,0.010433,-0.000874,0.012445,3
+Red neuronal (MLP),+ saldo,0.964004,0.005678,0.000514,0.004121,2
+Red neuronal (MLP),+ ticket + saldo,0.963282,0.00441,-0.000208,0.003484,3
+Random Forest,base,0.987121,0.003316,0.0,0.0,0
+Random Forest,+ ticket,0.988838,0.002336,0.001716,0.001095,5
+Random Forest,+ saldo,0.987084,0.003614,-3.7e-05,0.00113,3
+Random Forest,+ ticket + saldo,0.989282,0.002454,0.002161,0.000882,5
+AdaBoost,base,0.973985,0.006033,0.0,0.0,0
+AdaBoost,+ ticket,0.974665,0.004705,0.000679,0.001764,4
+AdaBoost,+ saldo,0.973985,0.006033,0.0,0.0,0
+AdaBoost,+ ticket + saldo,0.974665,0.004705,0.000679,0.001764,4
+Gradient Boosting,base,0.990054,0.00205,0.0,0.0,0
+Gradient Boosting,+ ticket,0.98989,0.00199,-0.000164,0.000404,1
+Gradient Boosting,+ saldo,0.990043,0.002126,-1.2e-05,0.00018,2
+Gradient Boosting,+ ticket + saldo,0.989879,0.001802,-0.000176,0.000747,2
+XGBoost,base,0.992231,0.001768,0.0,0.0,0
+XGBoost,+ ticket,0.991726,0.002462,-0.000505,0.000917,2
+XGBoost,+ saldo,0.992792,0.001841,0.00056,0.000524,4
+XGBoost,+ ticket + saldo,0.991965,0.002259,-0.000266,0.000813,3
+LightGBM,base,0.993067,0.00151,0.0,0.0,0
+LightGBM,+ ticket,0.992855,0.001329,-0.000213,0.00063,1
+LightGBM,+ saldo,0.993151,0.0012,8.4e-05,0.000552,4
+LightGBM,+ ticket + saldo,0.992993,0.001374,-7.4e-05,0.000562,3

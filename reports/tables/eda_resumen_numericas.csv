@@ -1,0 +1,15 @@
+variable,auc_univariada,sentido,mediana_se_queda,mediana_se_va,asimetria,pct_atipicos_iqr
+total_trans_ct,0.796,"más alto, menos churn",71.0,43.0,0.149,0.012
+total_ct_chng_q4_q1,0.748,"más alto, menos churn",0.721,0.529,2.248,3.913
+avg_utilization_ratio,0.694,"más alto, menos churn",0.212,0.0,0.711,0.0
+total_revolving_bal,0.69,"más alto, menos churn",1376.0,0.0,-0.161,0.0
+total_trans_amt,0.679,"más alto, menos churn",4098.0,2323.0,2.046,8.69
+contacts_count_12_mon,0.644,"más alto, más churn",2.0,3.0,0.002,6.382
+months_inactive_12_mon,0.635,"más alto, más churn",2.0,3.0,0.641,3.271
+total_relationship_count,0.621,"más alto, menos churn",4.0,3.0,-0.165,0.0
+total_amt_chng_q4_q1,0.58,"más alto, menos churn",0.742,0.698,1.801,3.839
+credit_limit,0.54,"más alto, menos churn",4642.0,4171.0,1.681,9.678
+avg_open_to_buy,0.525,"más alto, más churn",3450.0,3498.5,1.677,9.567
+dependent_count,0.525,"más alto, más churn",2.0,3.0,-0.024,0.0
+customer_age,0.512,"más alto, más churn",46.0,47.0,-0.034,0.025
+months_on_book,0.508,"más alto, más churn",36.0,36.0,-0.103,5.555

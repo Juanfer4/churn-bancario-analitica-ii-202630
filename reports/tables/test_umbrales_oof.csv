@@ -1,0 +1,5 @@
+,auc_oof,auc_cv_medio,umbral_max_f1
+LightGBM,0.994147,0.994148,0.221877
+XGBoost,0.993563,0.993561,0.404103
+Gradient Boosting,0.993427,0.993473,0.426306
+Regresión logística,0.95085,0.951039,0.423852

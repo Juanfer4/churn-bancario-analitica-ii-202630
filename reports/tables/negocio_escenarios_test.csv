@@ -1,0 +1,4 @@
+capacidad,contactados,churners_capturados,captura,precision,lift,beneficios_a_no_churners,churners_sin_contactar,umbral_implicito,captura_maxima_posible
+0.1,203,200,0.615385,0.985222,6.14172,3,125,0.995438,0.624615
+0.2,405,315,0.969231,0.777778,4.848547,90,10,0.011306,1.0
+0.3,608,324,0.996923,0.532895,3.321984,284,1,0.000167,1.0

@@ -1,0 +1,33 @@
+,oficial,candidato_produccion
+nombre,LightGBM completo (modelo oficial),LightGBM sin gender ni contacts_count_12_mon (candidato de producción)
+rol,oficial,candidato_produccion
+evaluado_en_test,True,False
+variables_excluidas,[],"['gender', 'contacts_count_12_mon']"
+clase_positiva,Attrited Customer,Attrited Customer
+semilla,42,42
+fecha_entrenamiento,2026-11-01,2026-11-01
+n_columnas_entrada,19,17
+huella_datos_train,6ef49142da0a,6ef49142da0a
+metrica__origen,"evaluación única en test, Fase 5 (5.1) del notebook (2.026 clientes)",validación cruzada de 5 pliegues en train (predicciones fuera de pliegue); no evaluado en test
+metrica__auc_test,0.99333604666938,
+metrica__ap_test,0.9685550545141568,
+metrica__brier_test,0.023278103262732,
+version__python,3.11.9,3.11.9
+version__scikit-learn,1.4.2,1.4.2
+version__lightgbm,4.7.0,4.7.0
+version__imbalanced-learn,0.14.2,0.14.2
+version__pandas,2.1.4,2.1.4
+version__numpy,1.26.4,1.26.4
+metrica__auc_cv,,0.993517651423623
+metrica__auc_cv_desv,,0.0013216517587159916
+metrica__auc_cv_oficial,,0.9941480112705718
+metrica__diferencia_auc_vs_oficial,,-0.0006303598469489024
+metrica__diferencia_desv,,0.0003918097299035913
+metrica__pliegues_por_debajo,,4
+metrica__ap_cv_oof,,0.9708595830515312
+metrica__churners_capturados_10,,799
+metrica__churners_capturados_20,,1272
+metrica__churners_capturados_30,,1295
+metrica__captura_10,,0.6136712749615976
+metrica__captura_20,,0.9769585253456221
+metrica__captura_30,,0.9946236559139785

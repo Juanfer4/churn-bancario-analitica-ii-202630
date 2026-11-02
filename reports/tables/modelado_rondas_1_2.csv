@@ -1,0 +1,8 @@
+modelo,auc_cv_anterior,auc_cv_nueva,cambio,desv_nueva,hiperparametros_anterior,hiperparametros_nueva
+SVM (kernel RBF),0.973919,0.975254,0.001335,0.002552,"{'C': 1, 'gamma': 0.1}","{'C': 3, 'gamma': 0.1}"
+Red neuronal (MLP),0.968373,0.972544,0.004171,0.002516,"{'alpha': 0.001, 'hidden_layer_sizes': (64, 32)}","{'alpha': 0.003, 'hidden_layer_sizes': (128, 64)}"
+Random Forest,0.989422,0.98992,0.000498,0.002381,"{'max_depth': 12, 'max_features': 0.5, 'min_samples_leaf': 1}","{'max_depth': None, 'max_features': 0.3, 'min_samples_leaf': 1}"
+AdaBoost,0.992011,0.992742,0.000731,0.001483,"{'estimator__max_depth': 2, 'learning_rate': 1.0, 'n_estimators': 600}","{'estimator__max_depth': 3, 'learning_rate': 0.5, 'n_estimators': 1000}"
+Gradient Boosting,0.992937,0.993473,0.000537,0.002012,"{'learning_rate': 0.1, 'max_depth': 3, 'n_estimators': 400}","{'learning_rate': 0.1, 'max_depth': 4, 'n_estimators': 400}"
+XGBoost,0.993501,0.993561,6e-05,0.001654,"{'learning_rate': 0.03, 'max_depth': 5, 'n_estimators': 600}","{'learning_rate': 0.05, 'max_depth': 5, 'n_estimators': 600}"
+LightGBM,0.99407,0.994148,7.8e-05,0.001141,"{'learning_rate': 0.03, 'n_estimators': 600, 'num_leaves': 31}","{'learning_rate': 0.03, 'n_estimators': 1000, 'num_leaves': 31}"

@@ -1,0 +1,9 @@
+modelo,familia,auc_cv,auc_cv_desv,ap_cv,auc_train,brecha_train_cv,tiempo_ajuste_s,candidatos,estrategia,mejores_hiperparametros
+LightGBM,boosting,0.994148,0.001141,0.973346,1.0,0.005852,4.830034,18,ninguna,"{'learning_rate': 0.03, 'n_estimators': 1000, 'num_leaves': 31}"
+XGBoost,boosting,0.993561,0.001654,0.971178,1.0,0.006439,3.247823,18,ninguna,"{'learning_rate': 0.05, 'max_depth': 5, 'n_estimators': 600}"
+Gradient Boosting,boosting,0.993473,0.002012,0.971379,1.0,0.006527,22.584285,8,ninguna,"{'learning_rate': 0.1, 'max_depth': 4, 'n_estimators': 400}"
+AdaBoost,boosting,0.992742,0.001483,0.96762,1.0,0.007258,65.455956,12,ninguna,"{'estimator__max_depth': 3, 'learning_rate': 0.5, 'n_estimators': 1000}"
+Random Forest,bagging,0.98992,0.002381,0.955245,1.0,0.01008,12.354191,18,ninguna,"{'max_depth': None, 'max_features': 0.3, 'min_samples_leaf': 1}"
+SVM (kernel RBF),kernel,0.975254,0.002552,0.904305,0.999721,0.024466,4.463698,12,ninguna,"{'C': 3, 'gamma': 0.1}"
+Red neuronal (MLP),red neuronal,0.972925,0.00377,0.902362,0.995682,0.022758,36.73453,6,ninguna,"{'alpha': 0.01, 'hidden_layer_sizes': (256, 128)}"
+Regresión logística,lineal,0.951039,0.001838,0.83646,0.953761,0.002722,1.914659,30,ninguna,"{'C': 1, 'penalty': 'l1'}"

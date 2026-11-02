@@ -1,0 +1,44 @@
+# Entorno y caches de Python
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Configuracion local del editor
+.vscode/
+
+# Originales de la raiz: se conservan intactos fuera del control de versiones.
+# Las copias versionadas e identicas (verificadas con SHA-256) estan en data/raw y docs/oficial.
+/bank_churn Dataset Juanfer y Juandi.xlsx
+/Caso de Negocio -  Churn - 2026-3 - Juanfer y Juandi.pdf
+
+# Salidas regenerables por codigo
+data/processed/*
+!data/processed/.gitkeep
+models/*
+!models/.gitkeep
+
+# Archivos que crean PyCaret y otras librerias al ejecutar
+logs.log
+logs/
+mlruns/
+catboost_info/
+
+# Credenciales y archivos sensibles (nunca se suben)
+.env
+*.key
+*.pem
+credentials*.json
+
+# Archivos temporales del sistema y de Office
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+
+# Material de apoyo interno (versión completa anterior del notebook y su texto): no es entregable
+informe/material_de_apoyo/

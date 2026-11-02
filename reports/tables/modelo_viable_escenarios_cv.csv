@@ -1,0 +1,7 @@
+modelo,capacidad,contactados,churners_capturados,captura,precision,lift,beneficios_a_no_churners,churners_sin_contactar,umbral_implicito,captura_maxima_posible
+oficial,0.1,810,799,0.613671,0.98642,6.13747,11,503,0.998205,0.62212
+oficial,0.2,1620,1269,0.974654,0.783333,4.873874,351,33,0.005984,1.0
+oficial,0.3,2430,1296,0.995392,0.533333,3.318382,1134,6,6.6e-05,1.0
+candidato de producción,0.1,810,799,0.613671,0.98642,6.13747,11,503,0.997665,0.62212
+candidato de producción,0.2,1620,1272,0.976959,0.785185,4.885396,348,30,0.00685,1.0
+candidato de producción,0.3,2430,1295,0.994624,0.532922,3.315821,1135,7,7.8e-05,1.0

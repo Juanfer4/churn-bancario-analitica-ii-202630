@@ -1,0 +1,5 @@
+modelo,auc_test,auc_ic95_inf,auc_ic95_sup,dif_vs_referencia,dif_ic95_inf,dif_ic95_sup,prop_remuestras_mejor_que_ref,equivalente_a_referencia
+LightGBM,0.993336,0.990613,0.995662,0.0,0.0,0.0,0.0,True
+XGBoost,0.993378,0.990626,0.995699,4.2e-05,-0.000724,0.0008,0.547,True
+Gradient Boosting,0.992723,0.989655,0.995342,-0.000613,-0.001728,0.000519,0.149,True
+Regresión logística,0.944512,0.932306,0.954992,-0.048824,-0.060204,-0.038889,0.0,False

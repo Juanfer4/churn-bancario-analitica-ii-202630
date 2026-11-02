@@ -1,0 +1,6 @@
+variable,categorias,p_valor,v_cramer,categoria_menos_frecuente,clientes_categoria_menos_frecuente
+gender,2,0.0002,0.0417,M,3829
+income_category,6,0.0387,0.0381,$120K +,588
+education_level,7,0.2039,0.0324,Doctorate,356
+marital_status,4,0.1343,0.0262,Divorced,599
+card_category,4,0.5165,0.0168,Platinum,17
