@@ -36,7 +36,3 @@ UMBRALES_MONITOREO = {
     "psi": (0.10, 0.25),             # índice de estabilidad poblacional por variable
     "caida_captura": (0.02, 0.05),   # caída de la captura del 20 % contactado, en puntos (0,02 = 2 pp)
 }
-
-# Valores del producto s · r (tasa de éxito del beneficio por valor relativo del cliente)
-# que se prueban en la lectura de negocio: SUPUESTOS de análisis, no datos del banco.
-PRODUCTOS_SR = (1.5, 3.0, 10.0, 30.0)

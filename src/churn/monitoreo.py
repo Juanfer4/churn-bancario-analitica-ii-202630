@@ -83,9 +83,10 @@ def captura_vs_base(y_real, probabilidad, captura_base: float, capacidad: float 
 def psi_puntaje(puntaje_referencia, puntaje_nuevo, umbrales: dict | None = None) -> dict:
     """PSI de la probabilidad de churn entre la referencia y un lote nuevo, con su semáforo.
 
-    La referencia debe ser del mismo tipo que el lote: puntajes del mismo modelo sobre los
-    clientes con que se entrenó (o sobre el primer lote en operación). Comparar puntajes de
-    entrenamiento contra puntajes fuera de pliegue daría una falsa alarma.
+    La referencia debe ser del mismo tipo que el lote. En operación los clientes son nuevos
+    para el modelo, así que la referencia son las predicciones fuera de pliegue de train (o el
+    primer lote real). Los puntajes de los clientes con que se entrenó son más extremos y, usados
+    como referencia, darían una falsa alarma con clientes nuevos.
     """
     amarillo, rojo = (umbrales or config.UMBRALES_MONITOREO)["psi"]
     valor = psi(pd.Series(np.asarray(puntaje_referencia, dtype=float)), pd.Series(np.asarray(puntaje_nuevo, dtype=float)))
@@ -94,19 +95,22 @@ def psi_puntaje(puntaje_referencia, puntaje_nuevo, umbrales: dict | None = None)
 
 def tabla_semaforos(pipeline, columnas: list[str], X_referencia: pd.DataFrame, lotes: dict[str, pd.DataFrame],
                     captura_base: float, y_lotes: dict[str, pd.Series] | None = None, capacidad: float = 0.2,
-                    umbrales: dict | None = None) -> pd.DataFrame:
+                    umbrales: dict | None = None, puntaje_referencia=None) -> pd.DataFrame:
     """Los tres indicadores de monitoreo, con su semáforo, para uno o varios lotes de clientes.
 
     pipeline y columnas: el modelo en uso y las columnas que recibe.
-    X_referencia: clientes con que se entrenó el modelo (referencia del PSI por variable y, puntuados
-        por el mismo modelo, del PSI del puntaje).
+    X_referencia: clientes con que se entrenó el modelo (referencia del PSI por variable).
     lotes: {nombre: clientes del lote}.
     captura_base: captura de referencia del top `capacidad` (por ejemplo, la de validación cruzada).
     y_lotes: churn real de cada lote, si ya se conoce. En operación se conoce un año después y se
         mide en el grupo de control; mientras tanto la captura queda pendiente y solo se leen los PSI.
+    puntaje_referencia: referencia del PSI del puntaje. En operación, las predicciones fuera de
+        pliegue de train. Si no se entrega, se puntúa `X_referencia` con el modelo: solo sirve
+        cuando los lotes también son clientes de entrenamiento (la demostración del notebook).
     """
     clase = list(pipeline.classes_).index(1)  # columna de la clase churn en predict_proba
-    puntaje_referencia = pipeline.predict_proba(X_referencia[columnas])[:, clase]
+    if puntaje_referencia is None:
+        puntaje_referencia = pipeline.predict_proba(X_referencia[columnas])[:, clase]
     etiqueta = f"captura {round(100 * capacidad)} %"
     filas = {}
     for nombre, X_lote in lotes.items():

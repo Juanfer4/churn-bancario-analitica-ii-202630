@@ -139,3 +139,30 @@ def tramos(serie: pd.Series, cortes: list[float], etiquetas: list[str]) -> pd.Se
     if resultado.isna().any():
         raise ValueError(f"Hay valores de {serie.name} fuera de los cortes {cortes}")
     return resultado
+
+
+def perfil_automatico(X: pd.DataFrame, y: pd.Series, ruta_html=None) -> pd.DataFrame:
+    """Perfil automático de los datos (EDA automático con ydata-profiling) y sus alertas.
+
+    Recorre todas las variables: distribución, ceros, valores únicos, correlaciones de Spearman
+    y asociación entre categóricas. Devuelve una tabla con una fila por alerta (`tipo` y
+    `variable`); si se indica `ruta_html`, guarda además el reporte completo para consultarlo.
+    Es un barrido de cobertura: señala qué revisar, no toma decisiones. Debe usarse solo con
+    train, igual que el resto del EDA.
+    """
+    import os
+    os.environ["YDATA_PROFILING_NO_ANALYTICS"] = "True"  # la librería no debe enviar datos de uso
+    from ydata_profiling import ProfileReport
+
+    tabla = X.assign(churn=np.asarray(y))
+    perfil = ProfileReport(
+        tabla, title="EDA automático de train", progress_bar=False,
+        correlations={"auto": {"calculate": False}, "pearson": {"calculate": False},
+                      "spearman": {"calculate": True}, "kendall": {"calculate": False},
+                      "phi_k": {"calculate": False}, "cramers": {"calculate": True}},
+        interactions={"continuous": False}, samples={"head": 0, "tail": 0}, duplicates={"head": 0})
+    alertas = pd.DataFrame([{"tipo": alerta.alert_type.name, "variable": alerta.column_name}
+                            for alerta in perfil.get_description().alerts], columns=["tipo", "variable"])
+    if ruta_html is not None:
+        perfil.to_file(ruta_html, silent=True)
+    return alertas.sort_values(["tipo", "variable"]).reset_index(drop=True)

@@ -23,9 +23,8 @@ def particion():
 @pytest.fixture(scope="module")
 def artefacto(particion):
     return produccion.crear_artefacto(
-        produccion.construir_pipeline_produccion(), particion.X_train, particion.y_train,
-        nombre="prueba", rol="candidato_produccion", evaluado_en_test=False,
-        excluidas=produccion.VARIABLES_EXCLUIDAS_PRODUCCION, metricas={"origen": "prueba"})
+        produccion.construir_pipeline_oficial(), particion.X_train, particion.y_train,
+        nombre="prueba", rol="oficial", evaluado_en_test=True, metricas={"origen": "prueba"})
 
 
 @pytest.fixture(scope="module")
@@ -50,17 +49,25 @@ def test_hiperparametros_fijos_coinciden_con_la_busqueda():
 
 
 def test_columnas_de_entrada():
-    oficial, prod = produccion.columnas_entrada(), produccion.columnas_entrada(produccion.VARIABLES_EXCLUIDAS_PRODUCCION)
-    assert len(oficial) == 19 and len(prod) == 17
-    assert set(oficial) - set(prod) == {"gender", "contacts_count_12_mon"}
+    oficial, alternativo = produccion.columnas_entrada(), produccion.columnas_entrada(produccion.VARIABLES_ALTERNATIVA)
+    prod = alternativo
+    assert len(oficial) == 14 and len(alternativo) == 13
+    assert set(oficial) - set(alternativo) == {"contacts_count_12_mon"}
+    assert not set(oficial) & set(datos.COLUMNAS_CATEGORICAS)  # 4.3: LightGBM no usa las categóricas
     assert datos.COLUMNA_ID not in oficial and config.OBJETIVO not in oficial
     assert prod == [c for c in oficial if c in prod]  # mismo orden
 
 
-def test_el_candidato_no_usa_las_variables_excluidas(artefacto):
+def test_el_pipeline_alternativo_no_recibe_contactos(particion):
+    alternativo = produccion.construir_pipeline_alternativo()
+    columnas = produccion.columnas_entrada(produccion.VARIABLES_ALTERNATIVA)
+    alternativo.fit(particion.X_train[columnas].iloc[:800], particion.y_train.iloc[:800])
+    assert not any(n.startswith("contacts") for n in features.nombres_salida(alternativo))
+
+
+def test_el_modelo_usa_los_hiperparametros_oficiales_y_ninguna_categorica(artefacto):
     nombres = features.nombres_salida(artefacto["pipeline"])
-    assert not any(n.startswith("gender") or n.startswith("contacts") for n in nombres)
-    # mismos hiperparámetros que el oficial
+    assert not any(n.startswith(c) for n in nombres for c in datos.COLUMNAS_CATEGORICAS)
     for clave, valor in produccion.HIPERPARAMETROS_OFICIALES.items():
         assert artefacto["hiperparametros"][clave] == valor
 
@@ -69,7 +76,7 @@ def test_el_candidato_no_usa_las_variables_excluidas(artefacto):
 def test_acepta_el_formato_del_banco_e_ignora_columnas_de_mas(clientes, artefacto):
     X, reporte = produccion.preparar_clientes(clientes, artefacto["columnas_entrada"], artefacto["rangos_train"])
     assert list(X.columns) == artefacto["columnas_entrada"] and X.index.name == datos.COLUMNA_ID
-    assert set(reporte["columnas_ignoradas"]) == {config.OBJETIVO, "gender", "contacts_count_12_mon"}
+    assert set(reporte["columnas_ignoradas"]) == {config.OBJETIVO, *datos.COLUMNAS_CATEGORICAS}
 
 
 @pytest.mark.parametrize("dano, mensaje", [
@@ -78,7 +85,6 @@ def test_acepta_el_formato_del_banco_e_ignora_columnas_de_mas(clientes, artefact
     (lambda df: df.assign(clientnum=df["clientnum"].where(df.index != 1, df["clientnum"].iloc[0])), "repetidos"),
     (lambda df: df.assign(credit_limit=df["credit_limit"].astype(str)), "numérica"),
     (lambda df: df.assign(avg_utilization_ratio=df["avg_utilization_ratio"].where(df.index != 2, 1.5)), "rangos de negocio"),
-    (lambda df: df.assign(card_category=df["card_category"].where(df.index != 0, "Diamante")), "no vistas"),
     (lambda df: df.iloc[0:0], "No hay clientes"),
 ])
 def test_detiene_datos_invalidos(clientes, artefacto, dano, mensaje):
@@ -91,11 +97,11 @@ def test_no_es_dataframe(artefacto):
         produccion.puntuar_clientes([[1, 2]], artefacto)
 
 
-def test_categoria_desconocida_no_estricta_solo_avisa(clientes, artefacto):
+def test_categoria_nueva_en_columna_que_el_modelo_no_usa_no_cambia_la_lista(clientes, artefacto):
+    """El modelo no recibe las categóricas (4.3): una categoría nueva en ellas no altera el resultado."""
     sucio = clientes.assign(card_category=clientes["card_category"].where(clientes.index != 0, "Diamante"))
-    with pytest.warns(UserWarning, match="no vistas"):
-        lista = produccion.puntuar_clientes(sucio, artefacto, estricto=False)
-    assert len(lista) == len(clientes)
+    limpia, con_cambio = produccion.puntuar_clientes(clientes, artefacto), produccion.puntuar_clientes(sucio, artefacto)
+    assert np.allclose(limpia["prob_churn"], con_cambio["prob_churn"])
 
 
 def test_avisa_valores_fuera_del_rango_de_train(clientes, artefacto):
@@ -182,9 +188,8 @@ def test_artefactos_invalidos(tmp_path, artefacto):
 
 def test_reentrenar_desde_cero_reproduce_el_modelo(particion, clientes, artefacto):
     otro = produccion.crear_artefacto(
-        produccion.construir_pipeline_produccion(), particion.X_train, particion.y_train,
-        nombre="prueba", rol="candidato_produccion", evaluado_en_test=False,
-        excluidas=produccion.VARIABLES_EXCLUIDAS_PRODUCCION)
+        produccion.construir_pipeline_oficial(), particion.X_train, particion.y_train,
+        nombre="prueba", rol="oficial", evaluado_en_test=True)
     assert otro["huella_datos_train"] == artefacto["huella_datos_train"]
     pd.testing.assert_frame_equal(produccion.puntuar_clientes(clientes, otro), produccion.puntuar_clientes(clientes, artefacto))
 
@@ -199,18 +204,17 @@ def test_oficial_reconstruido_igual_al_evaluado_en_test(particion):
     assert np.array_equal(oficial["pipeline"].predict_proba(muestra), buscado.predict_proba(muestra))
 
 
-def test_generar_modelos_distingue_los_dos_papeles(tmp_path, particion):
-    artefactos = produccion.generar_modelos(particion.X_train, particion.y_train, carpeta=tmp_path)
-    oficial = produccion.cargar_modelo(tmp_path / "modelo_oficial.joblib")
-    prod = produccion.cargar_modelo(tmp_path / "modelo_produccion.joblib")
-    assert oficial["rol"] == "oficial" and oficial["evaluado_en_test"] is True
-    assert prod["rol"] == "candidato_produccion" and prod["evaluado_en_test"] is False
-    assert "no evaluado en test" in prod["metricas"]["origen"]
-    assert not any("test" in k for k in prod["metricas"])  # ninguna métrica del candidato viene del test
-    assert prod["metricas"]["churners_capturados_20"] == artefactos["produccion"]["metricas"]["churners_capturados_20"]
-    assert oficial["huella_datos_train"] == prod["huella_datos_train"]  # mismos clientes de train
-    assert 0.98 < prod["metricas"]["auc_cv"] < 1
-    assert produccion.ficha(prod)["evaluado_en_test"] is False
+def test_generar_modelo_guarda_un_solo_modelo_con_su_ficha(tmp_path, particion):
+    artefacto = produccion.generar_modelo(particion.X_train, particion.y_train, carpeta=tmp_path,
+                                          metricas={"origen": "prueba", "auc_test": 0.99})
+    assert [r.name for r in tmp_path.glob("*.joblib")] == ["modelo_oficial.joblib"]
+    cargado = produccion.cargar_modelo(tmp_path / "modelo_oficial.joblib")
+    assert cargado["rol"] == "oficial" and cargado["evaluado_en_test"] is True
+    assert cargado["huella_datos_train"] == artefacto["huella_datos_train"]
+    assert produccion.ficha(cargado)["evaluado_en_test"] is True
+    controles = produccion.controles_modelo_viable(cargado, produccion.construir_pipeline_oficial().fit(
+        particion.X_train, particion.y_train), particion.X_train, particion.y_train)
+    assert controles["cumple"].all(), controles
 
 
 def test_linea_de_comandos_puntua_un_archivo(tmp_path, clientes, artefacto):

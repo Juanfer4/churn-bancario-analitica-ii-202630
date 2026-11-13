@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.inspection import partial_dependence, permutation_importance
-from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import cross_val_predict
 
 from churn import config, datos, evaluacion, exploracion, features, negocio
@@ -52,8 +51,11 @@ def importancia_permutacion_cv(pipeline, X: pd.DataFrame, y: pd.Series, cv, n_re
         resultado = permutation_importance(modelo, X.iloc[validar], y.iloc[validar], scoring="roc_auc",
                                            n_repeats=n_repeticiones, random_state=semilla + k, n_jobs=n_jobs)
         caidas.append(pd.Series(resultado.importances_mean, index=X.columns))
-    # Las columnas que el pipeline elimina (avg_open_to_buy) no se usan: su caída es 0 por construcción
-    tabla = pd.concat(caidas, axis=1).drop(index=features.COLUMNAS_A_ELIMINAR, errors="ignore")
+    # Solo se reportan las variables que llegan al modelo: las que el pipeline descarta
+    # (avg_open_to_buy y, si el modelo no las usa, las categóricas) tienen caída 0 por construcción
+    usadas = {_variable_original(nombre) for nombre in features.nombres_salida(modelo)}
+    tabla = pd.concat(caidas, axis=1)
+    tabla = tabla.loc[tabla.index.isin(usadas)]
     return pd.DataFrame({"caida_auc_media": tabla.mean(axis=1), "caida_auc_desv": tabla.std(axis=1, ddof=0),
                          "pliegues_con_caida": (tabla > 0).sum(axis=1)}).sort_values("caida_auc_media", ascending=False)
 
@@ -150,10 +152,9 @@ def sensibilidad_variables(pipeline, X: pd.DataFrame, y: pd.Series, cv, variante
 def equidad_por_grupo(y_real, probabilidad, grupo: pd.Series, capacidad: float = 0.2) -> pd.DataFrame:
     """Cómo trata el escenario de contacto a cada grupo (por ejemplo, por sexo o por tramo de edad).
 
-    Por grupo: tasa real de churn, porcentaje contactado, captura y precisión dentro del grupo,
-    falsas alarmas (fracción de quienes no se iban que recibe el beneficio) y AUC dentro del grupo
-    (qué tan bien ordena el modelo a sus clientes). Un trato equitativo contacta a cada grupo en
-    proporción a su riesgo real y ordena a todos con una calidad parecida."""
+    Por grupo: tamaño, tasa real de churn, porcentaje contactado, captura y precisión dentro del
+    grupo. Un trato proporcional contacta a cada grupo según su riesgo real: la razón entre el
+    porcentaje contactado y la tasa de churn (`razon_contacto_riesgo`) debe ser parecida."""
     y = np.asarray(y_real).astype(int)
     p = np.asarray(probabilidad, dtype=float)
     grupo = np.asarray(grupo)
@@ -165,14 +166,13 @@ def equidad_por_grupo(y_real, probabilidad, grupo: pd.Series, capacidad: float =
         m = grupo == valor
         churners = y[m].sum()
         tp = (y[m] & seleccionado[m]).sum()
-        filas.append({"grupo": valor, "clientes": int(m.sum()), "tasa_churn_real": y[m].mean(),
-                      "pct_contactado": seleccionado[m].mean(),
+        filas.append({"grupo": valor, "clientes": int(m.sum()), "churners": int(churners),
+                      "tasa_churn_real": y[m].mean(), "pct_contactado": seleccionado[m].mean(),
                       "captura_en_grupo": tp / churners if churners else np.nan,
-                      "precision_en_grupo": tp / seleccionado[m].sum() if seleccionado[m].sum() else np.nan,
-                      "falsas_alarmas_en_grupo": seleccionado[m & (y == 0)].mean() if (m & (y == 0)).any() else np.nan,
-                      "auc_en_grupo": roc_auc_score(y[m], p[m]) if 0 < churners < m.sum() else np.nan,
-                      "prob_media_predicha": p[m].mean()})
-    return pd.DataFrame(filas).set_index("grupo").sort_index()
+                      "precision_en_grupo": tp / seleccionado[m].sum() if seleccionado[m].sum() else np.nan})
+    tabla = pd.DataFrame(filas).set_index("grupo").sort_index()
+    tabla["razon_contacto_riesgo"] = tabla["pct_contactado"] / tabla["tasa_churn_real"]
+    return tabla
 
 
 def ic_brecha_captura(y_real, probabilidad, grupo: pd.Series, capacidad: float = 0.2,
@@ -223,9 +223,7 @@ def seleccion_en_grupo(y_real, probabilidades: dict[str, np.ndarray], mascara, c
     return pd.DataFrame(filas).set_index("variante")
 
 
-VARIANTES_SENSIBILIDAD = {"sin contactos": ["contacts_count_12_mon"], "sin sexo": ["gender"],
-                          "sin sexo ni ingresos": ["gender", "income_category"],
-                          "sin sexo ni contactos": ["gender", "contacts_count_12_mon"]}
+VARIANTES_SENSIBILIDAD = {"sin contactos": ["contacts_count_12_mon"]}
 
 TRAMOS_MONTO = exploracion.TRAMOS_MONTO  # mismos tramos del EDA (2.4)
 TRAMOS_EDAD = ([0, 35, 45, 55, 100], ["hasta 35", "36 a 45", "46 a 55", "más de 55"])  # para revisar el trato por edad (5.7)

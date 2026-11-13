@@ -5,12 +5,13 @@ parámetros de Yeo-Johnson, medias y desviaciones) se ajusta dentro de un Pipeli
 los datos de entrenamiento de cada pliegue, nunca con el test. Así la validación cruzada
 y la evaluación final miden el desempeño en datos que el modelo de verdad no ha visto.
 
-Decisiones que implementa (notebook 2.10):
+Decisiones que implementa (notebook 2.9):
 - Elimina `avg_open_to_buy` (identidad exacta: credit_limit - total_revolving_bal).
 - Variables candidatas opcionales: ticket promedio, saldo en cero y saldo en el máximo.
   Se activan o desactivan con parámetros para que la validación cruzada decida.
 - One-Hot para las categóricas, `Unknown` como categoría propia y agrupación de las
-  categorías con menos de 100 clientes.
+  categorías con menos de 100 clientes. Así se preparan para probarlas; la validación
+  cruzada de 4.3 decide, modelo por modelo, si se usan (`Modelo.usar_categoricas`).
 - Yeo-Johnson + estandarización solo para los modelos sensibles a la escala.
 """
 from __future__ import annotations
@@ -101,22 +102,18 @@ def construir_codificador(escalar: bool, categoricas: list[str] | None = None) -
       grupo si existe (o queda en ceros si no existe); en variables de dos valores se
       conserva una sola columna.
 
-    `categoricas` permite codificar solo una parte de las categóricas (por ejemplo, el
-    candidato de producción no recibe `gender`); por defecto se usan todas.
+    `categoricas` indica cuáles se codifican; por defecto, las cinco. Con una lista vacía
+    solo pasan las numéricas y las categóricas se descartan (así trabajan los modelos).
     """
     numericas = PowerTransformer(method="yeo-johnson", standardize=True) if escalar else "passthrough"
-    codificador_categoricas = OneHotEncoder(min_frequency=MIN_FRECUENCIA_CATEGORIA,
-                                handle_unknown="infrequent_if_exist",
-                                drop="if_binary", sparse_output=False)
-    return ColumnTransformer(
-        transformers=[
-            ("numericas", numericas, make_column_selector(dtype_include="number")),
-            ("categoricas", codificador_categoricas,
-             list(datos.COLUMNAS_CATEGORICAS if categoricas is None else categoricas)),
-        ],
-        remainder="drop",
-        verbose_feature_names_out=False,
-    )
+    categoricas = list(datos.COLUMNAS_CATEGORICAS if categoricas is None else categoricas)
+    transformadores = [("numericas", numericas, make_column_selector(dtype_include="number"))]
+    if categoricas:
+        codificador_categoricas = OneHotEncoder(min_frequency=MIN_FRECUENCIA_CATEGORIA,
+                                                handle_unknown="infrequent_if_exist",
+                                                drop="if_binary", sparse_output=False)
+        transformadores.append(("categoricas", codificador_categoricas, categoricas))
+    return ColumnTransformer(transformers=transformadores, remainder="drop", verbose_feature_names_out=False)
 
 
 def pasos_preparacion(escalar: bool, ticket_promedio: bool = False,
@@ -126,7 +123,7 @@ def pasos_preparacion(escalar: bool, ticket_promedio: bool = False,
     pasos van "planos": `variables`, `codificador`, `balanceo`, `modelo`.
 
     En GridSearchCV las candidatas se controlan con `variables__ticket_promedio` y
-    `variables__indicadores_saldo`.
+    `variables__indicadores_saldo`. `categoricas=[]` deja pasar solo las numéricas.
     """
     return [
         ("variables", CreadorVariables(ticket_promedio=ticket_promedio,
@@ -137,8 +134,8 @@ def pasos_preparacion(escalar: bool, ticket_promedio: bool = False,
 
 def construir_preparacion(escalar: bool, ticket_promedio: bool = False,
                           indicadores_saldo: bool = False) -> Pipeline:
-    """Preparación sola (variables + codificación), útil para inspeccionarla y probarla.
-    Los modelos usan los mismos pasos a través de `pasos_preparacion`."""
+    """Preparación sola (variables + codificación de las cinco categóricas), útil para
+    inspeccionarla y probarla. Los modelos usan los mismos pasos a través de `pasos_preparacion`."""
     return Pipeline(pasos_preparacion(escalar, ticket_promedio, indicadores_saldo))
 
 

@@ -32,11 +32,7 @@ TINTA_TENUE = "#898781"
 COLOR_GRILLA = "#e1e0d9"
 COLOR_EJE = "#c3c2b7"
 SUPERFICIE = "#fcfcfb"
-GRIS_NEUTRO = "#f0efec"
-ROJO_DIVERGENTE = "#e34948"
 
-MAPA_DIVERGENTE = LinearSegmentedColormap.from_list(
-    "azul_gris_rojo", [COLOR_SE_QUEDA, GRIS_NEUTRO, ROJO_DIVERGENTE])
 MAPA_SECUENCIAL = LinearSegmentedColormap.from_list(
     "azul_secuencial", ["#cde2fb", "#6da7ec", "#256abf", "#0d366b"])
 
@@ -206,32 +202,6 @@ def tasas_por_nivel(tablas: dict[str, pd.DataFrame], tasa_global: float, titulo:
         eje.set_title(col, loc="left", fontsize=10)
         eje.grid(axis="x", visible=False)
     fig.suptitle(titulo, y=1.02)
-    fig.tight_layout()
-    return fig
-
-
-def mapa_correlacion(corr: pd.DataFrame, titulo: str, umbral_etiqueta: float = 0.5) -> plt.Figure:
-    """Mapa de calor de correlación (triángulo inferior). Solo se rotulan los pares con
-    |r| >= umbral para dirigir la lectura a las redundancias que importan."""
-    mascara = np.triu(np.ones(corr.shape, dtype=bool))
-    valores = corr.mask(mascara)
-    fig, eje = plt.subplots(figsize=(9.5, 8))
-    imagen = eje.imshow(valores, cmap=MAPA_DIVERGENTE, vmin=-1, vmax=1)
-    n = len(corr)
-    eje.set_xticks(range(n), corr.columns, rotation=60, ha="right")
-    eje.set_yticks(range(n), corr.index)
-    for i in range(n):
-        for j in range(i):
-            r = corr.iloc[i, j]
-            if abs(r) >= umbral_etiqueta:
-                eje.text(j, i, decimal(r, 2), ha="center", va="center", fontsize=8,
-                         color="white" if abs(r) > 0.8 else TINTA_PRIMARIA)
-    eje.grid(False)
-    for lado in ("left", "bottom"):
-        eje.spines[lado].set_visible(False)
-    barra = fig.colorbar(imagen, ax=eje, shrink=0.75)
-    barra.set_label("Correlación de Spearman")
-    eje.set_title(titulo, loc="left")
     fig.tight_layout()
     return fig
 

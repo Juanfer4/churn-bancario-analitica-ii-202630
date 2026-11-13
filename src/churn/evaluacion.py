@@ -80,14 +80,6 @@ def auc_por_pliegue(y_real, probabilidad, pliegues) -> np.ndarray:
     return np.array([roc_auc_score(y[validar], p[validar]) for _, validar in pliegues])
 
 
-def umbral_max_f1(y_real, probabilidad) -> float:
-    """Umbral que maximiza el F1 (equilibrio entre precisión y captura de churners)."""
-    from sklearn.metrics import precision_recall_curve
-    precision, sensibilidad, umbrales = precision_recall_curve(y_real, probabilidad)
-    f1 = 2 * precision[:-1] * sensibilidad[:-1] / np.clip(precision[:-1] + sensibilidad[:-1], 1e-12, None)
-    return float(umbrales[int(np.argmax(f1))])
-
-
 def bootstrap_auc(y_real, probabilidades: dict[str, np.ndarray], referencia: str,
                   n_remuestras: int = 2000, semilla: int = config.SEMILLA) -> pd.DataFrame:
     """Bootstrap pareado del test: se remuestrean clientes con reposición (estratificado por
@@ -135,39 +127,10 @@ def tabla_calibracion(y_real, probabilidad, n_grupos: int = 10) -> pd.DataFrame:
     return tabla
 
 
-def tabla_calibracion_rangos(y_real, probabilidad,
-                             cortes=(0, 0.05, 0.2, 0.4, 0.6, 0.8, 0.95, 1)) -> pd.DataFrame:
-    """Calibración por rangos fijos de probabilidad predicha (no por deciles).
-
-    Con un modelo que da probabilidad casi 0 a la mayoría, los deciles juntan muchos grupos
-    vacíos de churn y diluyen el error; los rangos fijos muestran dónde se equivoca la
-    probabilidad (por ejemplo, en el riesgo intermedio)."""
-    datos_ = pd.DataFrame({"y": np.asarray(y_real).astype(int), "p": np.asarray(probabilidad, dtype=float)})
-    etiquetas = [f"{a:.0%} a {b:.0%}" for a, b in zip(cortes[:-1], cortes[1:])]
-    datos_["rango"] = pd.cut(datos_["p"], list(cortes), labels=etiquetas, include_lowest=True)
-    tabla = datos_.groupby("rango", observed=True).agg(clientes=("y", "size"), prob_media=("p", "mean"),
-                                                       tasa_real=("y", "mean"))
-    tabla["diferencia"] = tabla["prob_media"] - tabla["tasa_real"]
-    return tabla
-
-
 def error_calibracion(tabla: pd.DataFrame) -> float:
     """Error medio de calibración: diferencia absoluta promedio entre la probabilidad
     predicha y la tasa real, ponderada por clientes de cada grupo (0 = calibración perfecta)."""
     return float((tabla["clientes"] * tabla["diferencia"].abs()).sum() / tabla["clientes"].sum())
-
-
-def puntos_de_operacion(y_real, probabilidad, capturas=(0.80, 0.90, 0.95),
-                        falsas_alarmas_max=0.05) -> dict:
-    """Lectura de las curvas en puntos concretos: la mejor precisión posible si se quiere
-    capturar al menos cierta fracción de churners, y la mejor sensibilidad si se tolera como
-    máximo cierta tasa de falsas alarmas."""
-    from sklearn.metrics import precision_recall_curve, roc_curve
-    precision, captura, _ = precision_recall_curve(y_real, probabilidad)
-    salida = {f"precision_con_captura_{int(round(100 * c))}": float(precision[captura >= c].max()) for c in capturas}
-    fpr, tpr, _ = roc_curve(y_real, probabilidad)
-    salida[f"sensibilidad_con_falsas_alarmas_{int(round(100 * falsas_alarmas_max))}"] = float(tpr[fpr <= falsas_alarmas_max].max())
-    return salida
 
 
 def oof_de_modelos(pipelines: dict, X: pd.DataFrame, y: pd.Series, cv, n_jobs: int = -1) -> dict[str, np.ndarray]:
@@ -175,23 +138,16 @@ def oof_de_modelos(pipelines: dict, X: pd.DataFrame, y: pd.Series, cv, n_jobs: i
     return {nombre: predicciones_oof(pipe, X, y, cv, n_jobs) for nombre, pipe in pipelines.items()}
 
 
-def resumen_oof(oof: dict[str, np.ndarray], y: pd.Series, auc_cv_medio: dict[str, float]) -> tuple[dict, pd.DataFrame]:
-    """Umbral de máximo F1 por modelo (fijado solo con train) y tabla que lo compara con el
-    AUC de las predicciones fuera de pliegue y el AUC medio de la validación cruzada."""
-    umbrales = {nombre: umbral_max_f1(y, prob) for nombre, prob in oof.items()}
-    resumen = pd.DataFrame({
-        "auc_oof": {n: calcular_metricas(y, p)["auc"] for n, p in oof.items()},
-        "auc_cv_medio": {n: auc_cv_medio[n] for n in oof},
-        "umbral_max_f1": umbrales,
-    })
-    return umbrales, resumen
+def resumen_oof(oof: dict[str, np.ndarray], y: pd.Series, auc_cv_medio: dict[str, float]) -> pd.DataFrame:
+    """Control de coherencia: AUC de las predicciones fuera de pliegue frente al AUC medio de
+    la validación cruzada de la Fase 4. Deben coincidir: son los mismos pipelines y pliegues."""
+    return pd.DataFrame({"auc_oof": {n: calcular_metricas(y, p)["auc"] for n, p in oof.items()},
+                         "auc_cv_medio": {n: auc_cv_medio[n] for n in oof}})
 
 
-def metricas_en_test(y_test, probabilidades: dict[str, np.ndarray], umbrales_f1: dict[str, float]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Métricas en test con umbral 0,5 para todos y con el umbral de máximo F1 fijado en train."""
-    con_05 = tabla_metricas({n: calcular_metricas(y_test, p, 0.5) for n, p in probabilidades.items()})
-    con_f1 = tabla_metricas({n: calcular_metricas(y_test, p, umbrales_f1[n]) for n, p in probabilidades.items()})
-    return con_05, con_f1
+def metricas_en_test(y_test, probabilidades: dict[str, np.ndarray], umbral: float = 0.5) -> pd.DataFrame:
+    """Métricas en test de cada modelo con el mismo umbral (0,5, la vista clásica)."""
+    return tabla_metricas({n: calcular_metricas(y_test, p, umbral) for n, p in probabilidades.items()})
 
 
 def comparar_cv_test(resumen: pd.DataFrame, metricas_05: pd.DataFrame) -> pd.DataFrame:

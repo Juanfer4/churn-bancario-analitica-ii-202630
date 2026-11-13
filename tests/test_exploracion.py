@@ -72,3 +72,18 @@ def test_tramos_cubre_todo_y_rechaza_valores_fuera():
     assert list(t.astype(str)) == ["cero", "medio", "medio", "tope"]
     with pytest.raises(ValueError):
         exploracion.tramos(pd.Series([3000], name="saldo"), [-0.5, 0.5, 2517.5], ["a", "b"])
+
+
+def test_perfil_automatico_devuelve_alertas_y_guarda_el_reporte(tmp_path):
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=400)
+    X = pd.DataFrame({"a": a, "copia_de_a": a * 2 + rng.normal(scale=0.01, size=400),  # casi idénticas
+                      "ceros": np.where(rng.random(400) < 0.6, 0.0, rng.random(400)),   # muchos ceros
+                      "ruido": rng.normal(size=400)})
+    y = pd.Series(rng.integers(0, 2, 400))
+    ruta = tmp_path / "perfil.html"
+    alertas = exploracion.perfil_automatico(X, y, ruta)
+    assert list(alertas.columns) == ["tipo", "variable"] and ruta.exists()
+    correlacionadas = set(alertas.loc[alertas["tipo"] == "HIGH_CORRELATION", "variable"])
+    assert {"a", "copia_de_a"} <= correlacionadas and "ruido" not in correlacionadas
+    assert "ceros" in set(alertas.loc[alertas["tipo"] == "ZEROS", "variable"])

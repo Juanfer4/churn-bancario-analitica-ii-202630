@@ -8,10 +8,10 @@ Supuestos explícitos (no son datos del caso):
 Selección: se ordena a los clientes por probabilidad de churn (de mayor a menor) y se
 contacta al top k %. El beneficio se entrega a todos los contactados, se vayan o no.
 
-Beneficio neto de un escenario, en unidades del costo del beneficio:
+Beneficio neto de un grupo de contactos, en unidades del costo del beneficio:
     TP * s * r - n          (TP churners contactados, n contactados)
-Es positivo si r > 1 / (precisión * s): esa es la razón de equilibrio. Para pasar de un
-escenario al siguiente se usa la precisión marginal de los contactos que se agregan.
+Es positivo si s * r > 1 / precisión. Para decidir si se amplía el contacto de un escenario
+al siguiente se usa la precisión marginal de los contactos que se agregan (`tabla_cortes`).
 """
 from __future__ import annotations
 
@@ -86,22 +86,14 @@ def razon_equilibrio(precision: float | np.ndarray, tasa_exito: float) -> float 
     return float(resultado) if resultado.ndim == 0 else resultado
 
 
-def tabla_equilibrio(escenarios: pd.DataFrame, incremental: pd.DataFrame,
-                     tasas_exito=(0.2, 0.5, 1.0)) -> pd.DataFrame:
-    """Razón de equilibrio promedio (todo el escenario) y marginal (solo los contactos que
-    agrega frente al escenario anterior), para varias tasas de éxito supuestas."""
-    filas = []
-    for k in escenarios.index:
-        for s in tasas_exito:
-            filas.append({"capacidad": k, "tasa_exito": s,
-                          "r_equilibrio_promedio": razon_equilibrio(escenarios.loc[k, "precision"], s),
-                          "r_equilibrio_marginal": razon_equilibrio(incremental.loc[k, "precision_marginal"], s)})
-    return pd.DataFrame(filas)
-
-
-def beneficio_neto(escenarios: pd.DataFrame, tasa_exito: float, razon_valor_costo: float) -> pd.Series:
-    """Beneficio neto de cada escenario en unidades del costo del beneficio: TP * s * r - n."""
-    return escenarios["churners_capturados"] * tasa_exito * razon_valor_costo - escenarios["contactados"]
+def tabla_cortes(incremental: pd.DataFrame, tasa_exito_ejemplo: float = 0.5) -> pd.DataFrame:
+    """Regla económica por tramo de contacto. Ampliar hasta un tramo conviene si s * r supera
+    1 / precisión marginal de ese tramo (`sr_minimo`). La última columna traduce la regla a un
+    ejemplo: el valor mínimo de r = V / c si la tasa de éxito fuera `tasa_exito_ejemplo`."""
+    tabla = incremental[["contactos_adicionales", "churners_adicionales", "precision_marginal"]].copy()
+    tabla["sr_minimo"] = razon_equilibrio(tabla["precision_marginal"], 1.0)
+    tabla["r_minimo_ejemplo"] = razon_equilibrio(tabla["precision_marginal"], tasa_exito_ejemplo)
+    return tabla
 
 
 def tabla_deciles(y_real, probabilidad, n_grupos: int = 10) -> pd.DataFrame:
@@ -156,47 +148,12 @@ def bootstrap_escenarios(y_real, probabilidad, capacidades=config.ESCENARIOS_CAP
     return pd.DataFrame(filas).set_index("capacidad")
 
 
-def curva_beneficio(y_real, probabilidad, producto_rs: float) -> pd.DataFrame:
-    """Beneficio neto acumulado al contactar a los n clientes de mayor riesgo, para un valor
-    de s * r (tasa de éxito por razón valor/costo). Se expresa en unidades del costo del
-    beneficio por cliente de la base: (TP(n) * s * r - n) / N."""
-    y = np.asarray(y_real).astype(int)
-    orden = orden_por_riesgo(probabilidad)
-    tp = np.concatenate([[0], np.cumsum(y[orden])])
-    n = np.arange(len(y) + 1)
-    return pd.DataFrame({"fraccion_contactada": n / len(y), "contactados": n, "churners_capturados": tp,
-                         "beneficio_por_cliente": (tp * producto_rs - n) / len(y)})
-
-
-def tabla_beneficio_optimo(y_real, probabilidad, productos_rs=config.PRODUCTOS_SR,
-                           capacidades=config.ESCENARIOS_CAPACIDAD) -> pd.DataFrame:
-    """Para cada valor supuesto de s * r: la fracción de contacto que maximiza el beneficio
-    neto y el beneficio de cada escenario de capacidad (en unidades de costo por cliente)."""
-    y = np.asarray(y_real).astype(int)
-    filas = []
-    for rs in productos_rs:
-        curva = curva_beneficio(y, probabilidad, rs)
-        mejor = curva.loc[curva["beneficio_por_cliente"].idxmax()]
-        fila = {"producto_s_r": rs, "fraccion_optima": mejor["fraccion_contactada"],
-                "captura_en_optimo": mejor["churners_capturados"] / y.sum(),
-                "beneficio_optimo_por_cliente": mejor["beneficio_por_cliente"]}
-        for k in capacidades:
-            fila[f"beneficio_por_cliente_{int(round(100 * k))}"] = curva.loc[contactados(len(y), k), "beneficio_por_cliente"]
-        filas.append(fila)
-    return pd.DataFrame(filas).set_index("producto_s_r")
-
-
 def lectura_test(y_real, probabilidad, n_remuestras: int = 2000) -> dict[str, pd.DataFrame]:
     """Lectura de negocio sobre test: escenarios, incremental, intervalos por bootstrap y deciles."""
     escenarios = tabla_escenarios(y_real, probabilidad)
     return {"escenarios": escenarios, "incremental": tabla_incremental(escenarios),
             "intervalos": bootstrap_escenarios(y_real, probabilidad, n_remuestras=n_remuestras),
             "deciles": tabla_deciles(y_real, probabilidad)}
-
-
-def beneficio_optimo_por_producto(conjuntos: dict[str, tuple], productos_rs=config.PRODUCTOS_SR) -> dict[str, pd.DataFrame]:
-    """Contacto óptimo y beneficio por cliente para cada conjunto `{nombre: (y_real, probabilidad)}`."""
-    return {nombre: tabla_beneficio_optimo(y, p, productos_rs) for nombre, (y, p) in conjuntos.items()}
 
 
 def escenarios_por_modelo(y_real, probabilidades: dict[str, np.ndarray],

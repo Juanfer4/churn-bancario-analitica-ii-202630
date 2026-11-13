@@ -1,4 +1,4 @@
-"""Pruebas de la estructura del experimento (sin entrenar los ocho modelos completos)."""
+"""Pruebas de la estructura del experimento (sin entrenar los diez modelos completos)."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -22,13 +22,13 @@ def _modelo_pequeno(**kwargs):
     return modelos.Modelo(**base)
 
 
-def test_catalogo_tiene_ocho_modelos_con_nombres_unicos():
+def test_catalogo_tiene_diez_modelos_con_nombres_unicos():
     catalogo = modelos.catalogo_modelos()
-    assert len(catalogo) == 8
-    assert len({m.nombre for m in catalogo}) == 8
+    assert len(catalogo) == 10
+    assert len({m.nombre for m in catalogo}) == 10
     # Modelos sensibles a la escala con escalado; árboles y ensambles sin él
     escalados = {m.nombre for m in catalogo if m.escalar}
-    assert escalados == {"Regresión logística", "SVM (kernel RBF)", "Red neuronal (MLP)"}
+    assert escalados == {"Regresión logística", "SVM", "Red neuronal (MLP)"}
 
 
 def test_semilla_fija_en_todos_los_estimadores():
@@ -232,3 +232,17 @@ def test_cache_corrupta_se_reentrena(particion, tmp_path, capsys):
     comp = comparacion.entrenar_o_cargar(lote, X, y, tmp_path, "p", n_jobs=1)
     assert "no se pudo leer la caché" in capsys.readouterr().out
     assert comp.modelos["A"].busqueda_ is not None
+
+
+def test_auc_por_valor_y_combinacion_de_finalistas(particion):
+    X, y = particion.X_train.iloc[:1200], particion.y_train.iloc[:1200]
+    m = _modelo_pequeno(pesos=None, smote=False).ajustar(X, y, n_jobs=1)
+    por_valor = comparacion.auc_por_valor(m, "C")
+    assert len(por_valor) == 3 and por_valor["auc_cv"].iloc[0] == pytest.approx(m.resumen()["auc_cv"])
+    assert por_valor["auc_cv"].is_monotonic_decreasing
+    # Combinar un modelo consigo mismo no puede cambiar la votación: mismo AUC que la referencia
+    pipe = m.busqueda_.best_estimator_
+    tabla = comparacion.combinar_finalistas({"A": pipe, "B": pipe}, X, y, referencia="A", n_jobs=1)
+    assert list(tabla.index) == ["A", "Votación de finalistas", "Stacking de finalistas"]
+    assert tabla.loc["Votación de finalistas", "diferencia_vs_referencia"] == pytest.approx(0, abs=1e-12)
+    assert 0.5 < tabla.loc["Stacking de finalistas", "auc_cv"] <= 1

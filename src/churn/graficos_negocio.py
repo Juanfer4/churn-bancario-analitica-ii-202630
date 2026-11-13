@@ -9,11 +9,12 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
-from churn.graficos import (COLOR_EJE, COLOR_GRILLA, COLOR_SE_QUEDA, COLOR_SE_VA, SUPERFICIE, TINTA_PRIMARIA,
+from churn.graficos import (COLOR_EJE, COLOR_SE_QUEDA, COLOR_SE_VA, SUPERFICIE, TINTA_PRIMARIA,
                             TINTA_SECUNDARIA, TINTA_TENUE, decimal, entero, porcentaje, rejilla)
 from churn.graficos_modelado import estilos_modelos
 
 RAMPA_ORDINAL = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]  # de menor a mayor valor
+MAPA_RIESGO = LinearSegmentedColormap.from_list("riesgo_naranja", ["#fdf0ea", "#f5a37f", COLOR_SE_VA, "#8a3412"])
 
 
 def curvas_ganancia(curvas: dict[str, pd.DataFrame], tasa_churn: float, capacidades, titulo: str,
@@ -47,39 +48,6 @@ def curvas_ganancia(curvas: dict[str, pd.DataFrame], tasa_churn: float, capacida
     eje.legend(loc="lower right")
     fig.tight_layout()
     return fig
-
-
-def curvas_beneficio(curvas: dict[float, pd.DataFrame], capacidades, titulo: str,
-                     max_fraccion: float = 0.5) -> plt.Figure:
-    """Beneficio neto por cliente de la base (en unidades del costo del beneficio) según la
-    fracción contactada, para varios valores supuestos de s * r. El punto marca el óptimo."""
-    fig, eje = plt.subplots(figsize=(8.5, 5.2))
-    for k in capacidades:
-        eje.axvline(k, color=COLOR_GRILLA, linewidth=1.2, zorder=0)
-        eje.text(k, 1.0, f" {porcentaje(k, 0)}", transform=eje.get_xaxis_transform(), fontsize=8,
-                 color=TINTA_SECUNDARIA, va="top")
-    eje.axhline(0, color=COLOR_EJE, linewidth=1)
-    for color, (rs, curva) in zip(RAMPA_ORDINAL, curvas.items()):
-        tramo = curva[curva["fraccion_contactada"] <= max_fraccion]
-        eje.plot(tramo["fraccion_contactada"], tramo["beneficio_por_cliente"], color=color, linewidth=2,
-                 label=f"s · r = {decimal(rs, 1)}")
-        optimo = curva.loc[curva["beneficio_por_cliente"].idxmax()]
-        eje.scatter([optimo["fraccion_contactada"]], [optimo["beneficio_por_cliente"]], color=color, s=40,
-                    zorder=4, edgecolors=SUPERFICIE, linewidths=1.5)
-    eje.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: porcentaje(v, 0)))
-    eje.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: decimal(v, 2)))
-    eje.set_xlabel("Clientes contactados (de mayor a menor riesgo)")
-    eje.set_ylabel("Beneficio neto por cliente de la base\n(en unidades del costo del beneficio)")
-    eje.set_title(titulo, loc="left")
-    eje.legend(loc="upper right", title="Supuesto")
-    fig.tight_layout()
-    return fig
-
-
-# ---------------------------------------------------------------------------
-# Gráficos de explicabilidad (Fase 5, 5.6 a 5.8)
-# ---------------------------------------------------------------------------
-MAPA_RIESGO = LinearSegmentedColormap.from_list("riesgo_naranja", ["#fdf0ea", "#f5a37f", COLOR_SE_VA, "#8a3412"])
 
 
 def importancia_variables(ganancia: pd.Series, permutacion: pd.DataFrame, titulo: str) -> plt.Figure:

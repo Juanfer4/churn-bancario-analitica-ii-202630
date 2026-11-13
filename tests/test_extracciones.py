@@ -5,7 +5,7 @@ import pytest
 from sklearn.model_selection import StratifiedKFold
 from sklearn.linear_model import LogisticRegression
 
-from churn import comparacion, config, datos, evaluacion, explicabilidad, features, negocio, produccion
+from churn import comparacion, datos, evaluacion, explicabilidad, features, negocio, produccion
 
 
 @pytest.fixture(scope="module")
@@ -32,21 +32,19 @@ def test_oof_resumen_y_comparacion_cv_test(sintetico):
     cv = StratifiedKFold(3, shuffle=True, random_state=0)
     oof = evaluacion.oof_de_modelos({"lr": LogisticRegression()}, X, y, cv, n_jobs=1)
     assert oof["lr"].shape == (len(y),)
-    umbrales, resumen = evaluacion.resumen_oof(oof, y, {"lr": 0.8})
-    assert 0 < umbrales["lr"] < 1 and list(resumen.index) == ["lr"]
-    con_05, con_f1 = evaluacion.metricas_en_test(y, oof, umbrales)
-    assert list(con_05.index) == list(con_f1.index) == ["lr"]
+    resumen = evaluacion.resumen_oof(oof, y, {"lr": 0.8})
+    assert list(resumen.index) == ["lr"] and resumen.loc["lr", "auc_cv_medio"] == 0.8
+    con_05 = evaluacion.metricas_en_test(y, oof)
+    assert list(con_05.index) == ["lr"] and con_05.loc["lr", "umbral"] == 0.5
     comp = evaluacion.comparar_cv_test(resumen, con_05)
     assert np.isclose(comp.loc["lr", "diferencia_test_menos_cv"], comp.loc["lr", "auc_test"] - 0.8)
 
 
-def test_lectura_test_y_beneficio_por_producto(sintetico):
+def test_lectura_test_reune_las_cuatro_tablas(sintetico):
     y, prob = sintetico
     lectura = negocio.lectura_test(y, prob, n_remuestras=50)
     assert set(lectura) == {"escenarios", "incremental", "intervalos", "deciles"}
     pd.testing.assert_frame_equal(lectura["escenarios"], negocio.tabla_escenarios(y, prob))
-    por_producto = negocio.beneficio_optimo_por_producto({"x": (y, prob)})
-    pd.testing.assert_frame_equal(por_producto["x"], negocio.tabla_beneficio_optimo(y, prob, config.PRODUCTOS_SR))
 
 
 def test_tabla_importancia_rankings():
@@ -76,14 +74,6 @@ def test_agregar_escenarios_agrega_columnas(sintetico):
 
 def test_parametros_comparables_quita_direcciones():
     assert produccion.parametros_comparables({"f": object()})["f"].count(" at 0x") == 0
-
-
-def test_tabla_evidencia_cv_arma_dos_filas():
-    esc = pd.DataFrame({"churners_capturados": [10, 12], "captura": [.5, .6]},
-                       index=pd.MultiIndex.from_tuples([("oficial", .2), ("candidato de producción", .2)]))
-    t = produccion.tabla_evidencia_cv({"auc_cv_oficial": .9, "auc_cv": .89, "ap_cv_oof": .7}, .72, esc)
-    assert list(t.index) == ["oficial", "candidato de producción"]
-    assert t.loc["oficial", "captura_20"] == .5 and t.loc["candidato de producción", "ap_cv_oof"] == .7
 
 
 def test_tablas_y_decision_de_candidatas():

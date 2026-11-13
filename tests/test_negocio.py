@@ -40,17 +40,20 @@ def test_incremental_y_precision_marginal(caso):
     assert inc.loc[0.5, "precision_marginal"] == pytest.approx(2 / 3)
 
 
-def test_razon_equilibrio_y_beneficio_neto(caso):
+def test_razon_equilibrio_y_cortes_por_tramo(caso):
     y, p = caso
     assert negocio.razon_equilibrio(0.5, 0.5) == pytest.approx(4.0)
     assert negocio.razon_equilibrio(0.0, 0.5) == np.inf
     with pytest.raises(ValueError):
         negocio.razon_equilibrio(0.5, 0)
-    t = negocio.tabla_escenarios(y, p, (0.2,))
-    r_eq = negocio.razon_equilibrio(t.loc[0.2, "precision"], 0.5)
-    # Justo en la razón de equilibrio el beneficio neto es 0
-    assert negocio.beneficio_neto(t, 0.5, r_eq).loc[0.2] == pytest.approx(0.0)
-    assert negocio.beneficio_neto(t, 0.5, r_eq * 1.1).loc[0.2] > 0
+    incremental = negocio.tabla_incremental(negocio.tabla_escenarios(y, p, (0.2, 0.5)))
+    cortes = negocio.tabla_cortes(incremental, tasa_exito_ejemplo=0.5)
+    # El corte de cada tramo es 1 / precisión marginal; con s = 0,5 el valor mínimo de r es el doble
+    assert cortes.loc[0.5, "sr_minimo"] == pytest.approx(1 / incremental.loc[0.5, "precision_marginal"])
+    assert cortes["r_minimo_ejemplo"].tolist() == pytest.approx((2 * cortes["sr_minimo"]).tolist())
+    # Justo en el corte, los contactos del tramo ni ganan ni pierden: TP * (s * r) - n = 0
+    fila = cortes.loc[0.5]
+    assert fila["churners_adicionales"] * fila["sr_minimo"] - fila["contactos_adicionales"] == pytest.approx(0.0)
 
 
 def test_deciles_suman_y_captura_llega_a_1():
@@ -85,24 +88,6 @@ def test_bootstrap_escenarios_contiene_el_valor_observado():
     t = negocio.tabla_escenarios(y, p, (0.2,))
     assert ic.loc[0.2, "precision_ic95_inf"] <= t.loc[0.2, "precision"] <= ic.loc[0.2, "precision_ic95_sup"]
     assert ic.loc[0.2, "captura_ic95_inf"] <= t.loc[0.2, "captura"] <= ic.loc[0.2, "captura_ic95_sup"]
-
-
-def test_curva_beneficio_y_optimo_a_mano(caso):
-    y, p = caso
-    curva = negocio.curva_beneficio(y, p, producto_rs=2.0)
-    # Contactar a 1 (churner): 2 - 1 = 1; a 3 (2 churners): 4 - 3 = 1; a 5 (3 churners): 6 - 5 = 1; a 2: 2 - 2 = 0
-    assert list(curva["beneficio_por_cliente"].iloc[:6] * 10) == pytest.approx([0, 1, 0, 1, 0, 1])
-    t = negocio.tabla_beneficio_optimo(y, p, productos_rs=(2.0, 100.0), capacidades=(0.5,))
-    assert t.loc[2.0, "beneficio_optimo_por_cliente"] == pytest.approx(0.1)
-    assert t.loc[2.0, "fraccion_optima"] == pytest.approx(0.1)  # el primer máximo: contactar solo al primero
-    assert t.loc[100.0, "captura_en_optimo"] == 1.0
-    assert t.loc[2.0, "beneficio_por_cliente_50"] == pytest.approx(0.1)
-
-
-def test_con_valor_bajo_no_conviene_contactar(caso):
-    y, p = caso
-    t = negocio.tabla_beneficio_optimo(y, p, productos_rs=(0.5,), capacidades=(0.2,))
-    assert t.loc[0.5, "fraccion_optima"] == 0.0 and t.loc[0.5, "beneficio_optimo_por_cliente"] == 0.0
 
 
 def test_escenarios_por_modelo_compara_con_el_top_k(caso):

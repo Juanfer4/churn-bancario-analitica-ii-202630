@@ -22,7 +22,8 @@ from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline
 from lightgbm import LGBMClassifier
 from sklearn.base import BaseEstimator, clone
-from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import (AdaBoostClassifier, BaggingClassifier, GradientBoostingClassifier,
+                              RandomForestClassifier)
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.neural_network import MLPClassifier
@@ -47,12 +48,13 @@ class Modelo:
     """Un algoritmo con su grilla, su variante de preparación y su manejo del desbalance.
 
     nombre: nombre para tablas y gráficos.
-    familia: lineal, kernel, red neuronal, bagging o boosting.
+    familia: lineal, kernel, red neuronal, árbol, bagging o boosting.
     estimador: el algoritmo de sklearn, XGBoost o LightGBM con sus valores fijos.
     hiperparametros: grilla de GridSearchCV, con claves del pipeline (por ejemplo "modelo__C").
     escalar: True si el modelo necesita Yeo-Johnson y estandarización.
     pesos: (parámetro, valor) para la estrategia de pesos de clase, o None si no la admite.
     smote: True si se prueba la estrategia SMOTE.
+    usar_categoricas: False si el modelo no recibe las cinco categóricas (lo decide 4.3).
     """
 
     nombre: str
@@ -64,6 +66,7 @@ class Modelo:
     smote: bool = True
     ticket_promedio: bool = False
     indicadores_saldo: bool = False
+    usar_categoricas: bool = True
     busqueda_: GridSearchCV | None = field(default=None, repr=False)
     tiempo_busqueda_: float | None = None
 
@@ -71,7 +74,8 @@ class Modelo:
     def pipeline(self) -> Pipeline:
         """Pipeline completo sin ajustar: preparación + balanceo + modelo."""
         return Pipeline(
-            features.pasos_preparacion(self.escalar, self.ticket_promedio, self.indicadores_saldo)
+            features.pasos_preparacion(self.escalar, self.ticket_promedio, self.indicadores_saldo,
+                                       categoricas=None if self.usar_categoricas else [])
             + [("balanceo", "passthrough"), ("modelo", clone(self.estimador))]
         )
 
@@ -229,23 +233,35 @@ class Modelo:
 # Catálogo de modelos del experimento
 # ---------------------------------------------------------------------------
 def catalogo_modelos(semilla: int = config.SEMILLA) -> list[Modelo]:
-    """Los ocho modelos del experimento, uno por línea. Valores fijos (semilla, iteraciones)
-    en el estimador; lo que se busca, en la grilla."""
+    """Los diez modelos del experimento, uno por línea: los métodos de clasificación vistos
+    en el curso (el porqué de cada uno está en 4.2 del notebook). Valores fijos
+    (semilla, iteraciones) en el estimador; lo que se busca, en la grilla."""
     arbol_1 = DecisionTreeClassifier(max_depth=1, random_state=semilla)
     return [
         Modelo("Regresión logística", "lineal",
                LogisticRegression(solver="liblinear", max_iter=5000, random_state=semilla),
                {"modelo__C": [0.01, 0.1, 1, 10, 100], "modelo__penalty": ["l1", "l2"]},
                escalar=True, pesos=("class_weight", "balanced")),
-        Modelo("SVM (kernel RBF)", "kernel",
-               SVC(kernel="rbf", cache_size=1000, random_state=semilla),
-               {"modelo__C": [0.1, 1, 10, 100], "modelo__gamma": ["scale", 0.01, 0.1]},
+        Modelo("SVM", "kernel",
+               SVC(cache_size=1000, random_state=semilla),
+               {"modelo__kernel": ["linear", "poly", "rbf", "sigmoid"], "modelo__C": [0.1, 1, 10],
+                "modelo__gamma": ["scale", 0.1]},
                escalar=True, pesos=("class_weight", "balanced")),
         Modelo("Red neuronal (MLP)", "red neuronal",
                MLPClassifier(early_stopping=True, max_iter=1000, random_state=semilla),
-               {"modelo__hidden_layer_sizes": [(16,), (32,), (32, 16), (64, 32)],
+               {"modelo__activation": ["relu", "tanh", "logistic"],
+                "modelo__hidden_layer_sizes": [(16,), (32,), (32, 16), (64, 32)],
                 "modelo__alpha": [1e-4, 1e-3, 1e-2]},
                escalar=True, pesos=None),
+        Modelo("Árbol de decisión", "árbol",
+               DecisionTreeClassifier(random_state=semilla),
+               {"modelo__max_depth": [3, 5, 8, None], "modelo__min_samples_leaf": [1, 5, 20]},
+               escalar=False, pesos=("class_weight", "balanced")),
+        Modelo("Bagging de árboles", "bagging",
+               BaggingClassifier(estimator=DecisionTreeClassifier(random_state=semilla), n_estimators=200,
+                                 n_jobs=1, random_state=semilla),
+               {"modelo__max_samples": [0.5, 1.0], "modelo__max_features": [0.5, 1.0]},
+               escalar=False, pesos=None),
         Modelo("Random Forest", "bagging",
                RandomForestClassifier(n_estimators=300, n_jobs=1, random_state=semilla),
                {"modelo__max_depth": [None, 12], "modelo__min_samples_leaf": [1, 5],

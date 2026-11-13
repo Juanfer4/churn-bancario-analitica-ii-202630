@@ -53,16 +53,6 @@ def test_sin_predicciones_positivas_la_precision_queda_indefinida():
     assert np.isnan(m["precision"]) and m["sensibilidad"] == 0.0
 
 
-def test_umbral_max_f1_coincide_con_busqueda_exhaustiva():
-    rng = np.random.default_rng(1)
-    y = rng.integers(0, 2, 400)
-    p = np.clip(0.35 * y + rng.uniform(0, 0.65, 400), 0, 1)
-    umbral = evaluacion.umbral_max_f1(y, p)
-    f1_elegido = evaluacion.calcular_metricas(y, p, umbral)["f1"]
-    mejor_f1 = max(evaluacion.calcular_metricas(y, p, u)["f1"] for u in np.unique(p))
-    assert f1_elegido == pytest.approx(mejor_f1)
-
-
 def test_bootstrap_modelo_identico_es_equivalente_y_reproducible():
     rng = np.random.default_rng(2)
     y = rng.integers(0, 2, 300)
@@ -87,23 +77,3 @@ def test_calibracion_de_un_modelo_bien_calibrado_y_uno_sesgado():
     assert evaluacion.error_calibracion(tabla) < 0.02
     sesgada = evaluacion.tabla_calibracion(y, p ** 3)  # subestima el riesgo
     assert evaluacion.error_calibracion(sesgada) > 0.1
-
-
-def test_puntos_de_operacion_en_caso_separable_y_al_azar():
-    y = np.array([0] * 80 + [1] * 20)
-    perfecto = np.r_[np.linspace(0, 0.4, 80), np.linspace(0.6, 1, 20)]
-    m = evaluacion.puntos_de_operacion(y, perfecto)
-    assert m["precision_con_captura_90"] == 1.0 and m["sensibilidad_con_falsas_alarmas_5"] == 1.0
-    rng = np.random.default_rng(4)
-    azar = evaluacion.puntos_de_operacion(np.r_[np.zeros(8000), np.ones(2000)], rng.uniform(size=10000))
-    assert abs(azar["precision_con_captura_95"] - 0.2) < 0.03
-
-
-def test_calibracion_por_rangos_detecta_subestimacion_intermedia():
-    rng = np.random.default_rng(6)
-    p = rng.random(20000)
-    y = (rng.random(20000) < np.where((p > 0.2) & (p <= 0.4), 0.6, p)).astype(int)  # el modelo subestima en 20-40 %
-    tabla = evaluacion.tabla_calibracion_rangos(y, p)
-    assert tabla["clientes"].sum() == 20000 and list(tabla.index)[0] == "0% a 5%"
-    assert tabla.loc["20% a 40%", "diferencia"] < -0.2
-    assert abs(tabla.loc["60% a 80%", "diferencia"]) < 0.03

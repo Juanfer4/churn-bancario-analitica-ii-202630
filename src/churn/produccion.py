@@ -1,18 +1,12 @@
 """Modelo viable: guardar el modelo, cargarlo fuera del notebook y puntuar clientes nuevos.
 
-Se guardan dos modelos con papeles distintos, y el archivo de cada uno lo dice:
+Se guarda un solo modelo (`modelo_oficial.joblib`): el LightGBM elegido en la Fase 4, con las
+variables que decidió la validación cruzada (4.3), entrenado con los 8.101 clientes de train
+y evaluado en test (Fase 5, 5.1). El modelo que se evalúa es el mismo que se usa para puntuar.
 
-- **Modelo oficial** (`modelo_oficial.joblib`): el LightGBM completo, elegido en la Fase 4
-  y evaluado una sola vez en test (Fase 5, 5.1). Sus métricas de test son los resultados
-  oficiales del proyecto. Se conserva como referencia.
-- **Candidato de producción** (`modelo_produccion.joblib`): el mismo LightGBM (mismos
-  hiperparámetros, misma preparación) sin `gender` ni `contacts_count_12_mon`, por los
-  riesgos de sesgo y de fuga revisados en la Fase 5 (5.7). Su evidencia es la validación
-  cruzada en train; **no se evaluó en test** y sus métricas no deben presentarse como tales.
-
-Ambos se entrenan con los mismos 8.101 clientes de train. El candidato no se reentrena con
-train + test: así su procedimiento de entrenamiento es exactamente el que respalda la
-validación cruzada y el test queda intacto.
+`construir_pipeline_alternativo` arma el mismo modelo sin `contacts_count_12_mon`. No se
+guarda ni se usa: queda disponible por si el banco confirma que esa variable incluye el
+trámite de retiro (5.7 mide que sin ella el resultado casi no cambia).
 
 Uso fuera del notebook (desde la raíz del repositorio, con el entorno activado):
 
@@ -22,7 +16,7 @@ Uso fuera del notebook (desde la raíz del repositorio, con el entorno activado)
 o desde Python:
 
     from churn import produccion
-    modelo = produccion.cargar_modelo()            # candidato de producción por defecto
+    modelo = produccion.cargar_modelo()
     lista = produccion.puntuar_clientes(clientes, modelo, capacidad=0.2)
 """
 from __future__ import annotations
@@ -33,6 +27,7 @@ import platform
 import re
 import warnings
 from datetime import date
+from dataclasses import replace
 from pathlib import Path
 
 import imblearn
@@ -44,12 +39,12 @@ import sklearn
 from sklearn.base import clone
 from sklearn.preprocessing import PowerTransformer
 
-from churn import config, datos, evaluacion, features, modelos, negocio
+from churn import config, datos, features, modelos, negocio
 
 NOMBRE_MODELO_OFICIAL = "LightGBM"
-VARIABLES_EXCLUIDAS_PRODUCCION = ["gender", "contacts_count_12_mon"]
+USA_CATEGORICAS_OFICIAL = False  # decisión de 4.3: LightGBM no recibe las cinco categóricas
+VARIABLES_ALTERNATIVA = ["contacts_count_12_mon"]  # se quitan solo en el pipeline alternativo
 RUTA_MODELO_OFICIAL = config.RUTA_MODELOS / "modelo_oficial.joblib"
-RUTA_MODELO_PRODUCCION = config.RUTA_MODELOS / "modelo_produccion.joblib"
 
 # Hiperparámetros que eligió la búsqueda de la Fase 4 para el LightGBM oficial (ronda 2).
 # Se fijan aquí para poder reconstruir el modelo sin repetir los 50 minutos de búsqueda;
@@ -79,10 +74,11 @@ def _modelo_catalogo(nombre: str = NOMBRE_MODELO_OFICIAL) -> modelos.Modelo:
 
 def construir_pipeline_oficial():
     """Pipeline del modelo oficial sin ajustar: el del catálogo con los hiperparámetros elegidos."""
-    return _modelo_catalogo().pipeline().set_params(**HIPERPARAMETROS_OFICIALES)
+    modelo = replace(_modelo_catalogo(), usar_categoricas=USA_CATEGORICAS_OFICIAL)
+    return modelo.pipeline().set_params(**HIPERPARAMETROS_OFICIALES)
 
 
-def construir_pipeline_produccion(pipeline_referencia=None, excluidas=VARIABLES_EXCLUIDAS_PRODUCCION):
+def construir_pipeline_alternativo(pipeline_referencia=None, excluidas=VARIABLES_ALTERNATIVA):
     """Mismo pipeline que el oficial, sin las variables excluidas.
 
     Se clona el pipeline de referencia (mismos pasos e hiperparámetros) y solo se cambia el
@@ -92,14 +88,17 @@ def construir_pipeline_produccion(pipeline_referencia=None, excluidas=VARIABLES_
     pipeline = clone(pipeline_referencia if pipeline_referencia is not None else construir_pipeline_oficial())
     numericas = pipeline.named_steps["codificador"].transformers[0][1]
     escalar = isinstance(numericas, PowerTransformer)
-    categoricas = [c for c in datos.COLUMNAS_CATEGORICAS if c not in excluidas]
+    usa_categoricas = len(pipeline.named_steps["codificador"].transformers) > 1
+    categoricas = [c for c in datos.COLUMNAS_CATEGORICAS if c not in excluidas] if usa_categoricas else []
     return pipeline.set_params(codificador=features.construir_codificador(escalar=escalar, categoricas=categoricas))
 
 
 def columnas_entrada(excluidas=()) -> list[str]:
-    """Columnas que recibe el modelo, en el orden del archivo original (sin id ni objetivo)."""
+    """Columnas que recibe el modelo, en el orden del archivo original (sin id ni objetivo
+    ni las categóricas, si el modelo oficial no las usa)."""
+    sin_uso = [] if USA_CATEGORICAS_OFICIAL else datos.COLUMNAS_CATEGORICAS
     return [c for c in datos.COLUMNAS_ESPERADAS
-            if c not in (datos.COLUMNA_ID, config.OBJETIVO) and c not in excluidas]
+            if c not in (datos.COLUMNA_ID, config.OBJETIVO) and c not in excluidas and c not in sin_uso]
 
 
 # ---------------------------------------------------------------------------
@@ -183,8 +182,8 @@ def preparar_clientes(clientes: pd.DataFrame, columnas: list[str], rangos_train:
 # ---------------------------------------------------------------------------
 def huella_datos(X: pd.DataFrame, y: pd.Series) -> str:
     """Huella SHA-256 de los datos de entrenamiento (para saber con qué datos se entrenó).
-    Se calcula sobre todas las columnas explicativas, así el oficial y el candidato, que usan
-    los mismos clientes, tienen la misma huella aunque el candidato use menos columnas."""
+    Se calcula sobre todas las columnas de entrada del modelo oficial, así cualquier modelo
+    entrenado con los mismos clientes tiene la misma huella aunque use menos columnas."""
     h = hashlib.sha256()
     h.update(pd.util.hash_pandas_object(X, index=True).values.tobytes())
     h.update(pd.util.hash_pandas_object(y, index=True).values.tobytes())
@@ -202,8 +201,8 @@ def versiones() -> dict:
 def crear_artefacto(pipeline_sin_ajustar, X_train: pd.DataFrame, y_train: pd.Series, *, nombre: str, rol: str,
                     evaluado_en_test: bool, excluidas=(), metricas: dict | None = None) -> dict:
     """Ajusta el pipeline con train y lo empaqueta con todo lo necesario para usarlo y auditarlo."""
-    if rol not in ("oficial", "candidato_produccion"):
-        raise ValueError("rol debe ser 'oficial' o 'candidato_produccion'")
+    if rol not in ("oficial", "alternativo"):
+        raise ValueError("rol debe ser 'oficial' o 'alternativo'")
     columnas = columnas_entrada(excluidas)
     X = X_train[columnas]
     pipeline = clone(pipeline_sin_ajustar).fit(X, y_train)
@@ -230,7 +229,7 @@ def guardar_modelo(artefacto: dict, ruta: Path) -> Path:
     return ruta
 
 
-def cargar_modelo(ruta: Path = RUTA_MODELO_PRODUCCION) -> dict:
+def cargar_modelo(ruta: Path = RUTA_MODELO_OFICIAL) -> dict:
     """Carga un artefacto guardado y revisa que esté completo. Avisa si las versiones de las
     librerías no son las del entrenamiento."""
     ruta = Path(ruta)
@@ -269,7 +268,7 @@ def puntuar_clientes(clientes: pd.DataFrame, modelo: dict | None = None, capacid
                      estricto: bool = True) -> pd.DataFrame:
     """Lista de clientes priorizada por probabilidad de churn, de mayor a menor riesgo.
 
-    - `modelo`: artefacto de `cargar_modelo` (por defecto, el candidato de producción).
+    - `modelo`: artefacto de `cargar_modelo` (por defecto, el modelo oficial).
     - `capacidad`: fracción de la base que el área comercial puede contactar (por ejemplo
       0,2); marca a los clientes que entran en ese escenario, con el mismo redondeo de la
       Fase 5 (5.4 y 5.5). Si es None no marca a nadie.
@@ -302,34 +301,6 @@ def puntuar_clientes(clientes: pd.DataFrame, modelo: dict | None = None, capacid
 # ---------------------------------------------------------------------------
 # 5. Generación de los dos modelos (la usan el notebook y la línea de comandos)
 # ---------------------------------------------------------------------------
-def evidencia_cv_produccion(pipeline_oficial, X_train: pd.DataFrame, y_train: pd.Series, cv=None,
-                            n_jobs: int = -1) -> tuple[dict, dict]:
-    """Validación cruzada del candidato de producción en train, pareada con el oficial (mismos
-    pliegues). Es la única evidencia de desempeño del candidato: no se evalúa en test."""
-    cv = cv or modelos.validacion_cruzada()
-    pliegues = list(cv.split(X_train, y_train))
-    produccion = construir_pipeline_produccion(pipeline_oficial)
-    oof = {
-        "oficial": evaluacion.predicciones_oof(clone(pipeline_oficial), X_train[columnas_entrada()], y_train, pliegues, n_jobs),
-        "produccion": evaluacion.predicciones_oof(produccion, X_train[columnas_entrada(VARIABLES_EXCLUIDAS_PRODUCCION)],
-                                                  y_train, pliegues, n_jobs),
-    }
-    auc = {k: evaluacion.auc_por_pliegue(y_train, v, pliegues) for k, v in oof.items()}
-    diferencia = auc["produccion"] - auc["oficial"]
-    escenarios = negocio.tabla_escenarios(y_train, oof["produccion"])
-    metricas = {
-        "origen": "validación cruzada de 5 pliegues en train (predicciones fuera de pliegue); no evaluado en test",
-        "auc_cv": float(auc["produccion"].mean()), "auc_cv_desv": float(auc["produccion"].std()),
-        "auc_cv_oficial": float(auc["oficial"].mean()),
-        "diferencia_auc_vs_oficial": float(diferencia.mean()), "diferencia_desv": float(diferencia.std()),
-        "pliegues_por_debajo": int((diferencia < 0).sum()),
-        "ap_cv_oof": float(evaluacion.calcular_metricas(y_train, oof["produccion"])["ap"]),
-        **{f"churners_capturados_{round(100 * k)}": int(escenarios.loc[k, "churners_capturados"]) for k in escenarios.index},
-        **{f"captura_{round(100 * k)}": float(escenarios.loc[k, "captura"]) for k in escenarios.index},
-    }
-    return metricas, oof
-
-
 def metricas_test_oficial(ruta: Path = config.RUTA_TABLAS / "test_metricas_umbral_05.csv") -> dict:
     """Métricas oficiales del test (Fase 5, 5.1) leídas de la tabla que guardó el notebook.
     No se vuelve a predecir el test."""
@@ -340,29 +311,15 @@ def metricas_test_oficial(ruta: Path = config.RUTA_TABLAS / "test_metricas_umbra
             "auc_test": float(fila["auc"]), "ap_test": float(fila["ap"]), "brier_test": float(fila["brier"])}
 
 
-def generar_modelos(X_train: pd.DataFrame, y_train: pd.Series, pipeline_oficial=None,
-                    metricas_oficial: dict | None = None, metricas_produccion: dict | None = None,
-                    carpeta: Path = config.RUTA_MODELOS, n_jobs: int = -1) -> dict[str, dict]:
-    """Entrena, documenta y guarda el modelo oficial y el candidato de producción.
-
-    Si no se entregan las métricas, se leen las del test de la Fase 5 (5.1) (oficial) y se
-    calcula la validación cruzada del candidato (unos segundos)."""
+def generar_modelo(X_train: pd.DataFrame, y_train: pd.Series, pipeline_oficial=None,
+                   metricas: dict | None = None, carpeta: Path = config.RUTA_MODELOS) -> dict:
+    """Entrena, documenta y guarda el modelo oficial. Si no se entregan las métricas, se leen
+    las del test de la Fase 5 (5.1) de la tabla que guardó el notebook."""
     pipeline_oficial = clone(pipeline_oficial) if pipeline_oficial is not None else construir_pipeline_oficial()
-    if metricas_produccion is None:
-        metricas_produccion, _ = evidencia_cv_produccion(pipeline_oficial, X_train, y_train, n_jobs=n_jobs)
-    artefactos = {
-        "oficial": crear_artefacto(pipeline_oficial, X_train, y_train, nombre="LightGBM completo (modelo oficial)",
-                                   rol="oficial", evaluado_en_test=True,
-                                   metricas=metricas_oficial or metricas_test_oficial()),
-        "produccion": crear_artefacto(construir_pipeline_produccion(pipeline_oficial), X_train, y_train,
-                                      nombre="LightGBM sin gender ni contacts_count_12_mon (candidato de producción)",
-                                      rol="candidato_produccion", evaluado_en_test=False,
-                                      excluidas=VARIABLES_EXCLUIDAS_PRODUCCION, metricas=metricas_produccion),
-    }
-    carpeta = Path(carpeta)
-    guardar_modelo(artefactos["oficial"], carpeta / RUTA_MODELO_OFICIAL.name)
-    guardar_modelo(artefactos["produccion"], carpeta / RUTA_MODELO_PRODUCCION.name)
-    return artefactos
+    artefacto = crear_artefacto(pipeline_oficial, X_train, y_train, nombre="LightGBM (modelo oficial)",
+                                rol="oficial", evaluado_en_test=True, metricas=metricas or metricas_test_oficial())
+    guardar_modelo(artefacto, Path(carpeta) / RUTA_MODELO_OFICIAL.name)
+    return artefacto
 
 
 def ficha(artefacto: dict) -> pd.Series:
@@ -387,19 +344,18 @@ def _leer_tabla(ruta: Path) -> pd.DataFrame:
 def main(argumentos: list[str] | None = None) -> None:
     lector = argparse.ArgumentParser(prog="python -m churn.produccion", description=__doc__.splitlines()[0])
     acciones = lector.add_subparsers(dest="accion", required=True)
-    acciones.add_parser("entrenar", help="Entrena y guarda el modelo oficial y el candidato de producción")
+    acciones.add_parser("entrenar", help="Entrena y guarda el modelo oficial")
     puntuar = acciones.add_parser("puntuar", help="Puntúa un archivo de clientes y guarda la lista priorizada")
     puntuar.add_argument("entrada", help="Archivo .xlsx o .csv con los clientes")
     puntuar.add_argument("salida", help="Archivo .csv donde se guarda la lista")
     puntuar.add_argument("--capacidad", type=float, default=None, help="Fracción a contactar, por ejemplo 0.2")
-    puntuar.add_argument("--modelo", default=str(RUTA_MODELO_PRODUCCION), help="Ruta del artefacto del modelo")
+    puntuar.add_argument("--modelo", default=str(RUTA_MODELO_OFICIAL), help="Ruta del artefacto del modelo")
     args = lector.parse_args(argumentos)
 
     if args.accion == "entrenar":
         _, particion, _ = datos.preparar_datos(guardar=False)
-        artefactos = generar_modelos(particion.X_train, particion.y_train)
-        for rol, artefacto in artefactos.items():
-            print(f"{rol}: {artefacto['nombre']} | métricas: {artefacto['metricas'].get('origen')}")
+        artefacto = generar_modelo(particion.X_train, particion.y_train)
+        print(f"{artefacto['nombre']} | métricas: {artefacto['metricas'].get('origen')}")
     else:
         lista = puntuar_clientes(_leer_tabla(args.entrada), cargar_modelo(Path(args.modelo)), capacidad=args.capacidad)
         lista.to_csv(args.salida)
@@ -412,43 +368,22 @@ def parametros_comparables(parametros: dict) -> dict:
     return {k: re.sub(r" at 0x[0-9a-fA-F]+", "", repr(v)) for k, v in parametros.items()}
 
 
-def tabla_evidencia_cv(metricas: dict, ap_oficial: float, escenarios_cv: pd.DataFrame) -> pd.DataFrame:
-    """Evidencia del candidato de producción frente al oficial, ambos por validación cruzada en train."""
-    def valor(modelo, columna):
-        return escenarios_cv.loc[(modelo, 0.2), columna]  # una celda, para conservar su tipo (entero)
-    return pd.DataFrame({
-        "auc_cv": [metricas["auc_cv_oficial"], metricas["auc_cv"]],
-        "ap_cv_oof": [ap_oficial, metricas["ap_cv_oof"]],
-        "churners_20": [valor("oficial", "churners_capturados"), valor("candidato de producción", "churners_capturados")],
-        "captura_20": [valor("oficial", "captura"), valor("candidato de producción", "captura")],
-        "origen": "validación cruzada en train"}, index=["oficial", "candidato de producción"])
-
-
-def controles_modelo_viable(oficial_cargado: dict, produccion_cargado: dict, pipeline_final, X: pd.DataFrame,
-                            y: pd.Series) -> pd.DataFrame:
-    """Los ocho controles que demuestran que lo guardado es lo evaluado: tabla de `control` y `cumple`."""
-    cols_prod = produccion_cargado["columnas_entrada"]
-    oficial_desde_cero = clone(construir_pipeline_oficial()).fit(X, y)
-    produccion_desde_cero = clone(construir_pipeline_produccion()).fit(X[cols_prod], y)
-    prob_prod = produccion_cargado["pipeline"].predict_proba(X[cols_prod])[:, 1]
+def controles_modelo_viable(modelo_cargado: dict, pipeline_final, X: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+    """Controles de integridad: lo guardado es lo evaluado. No miden desempeño.
+    Devuelve una tabla de `control` y `cumple`."""
+    desde_cero = clone(construir_pipeline_oficial()).fit(X, y)
     return pd.DataFrame([
         ("Hiperparámetros fijos = los elegidos por la búsqueda",
          parametros_comparables(construir_pipeline_oficial().get_params()) == parametros_comparables(clone(pipeline_final).get_params())),
-        ("Oficial guardado = modelo evaluado en test (predicciones en train)",
-         np.array_equal(oficial_cargado["pipeline"].predict_proba(X), pipeline_final.predict_proba(X))),
-        ("Oficial reconstruido sin caché = modelo evaluado en test",
-         np.array_equal(oficial_desde_cero.predict_proba(X), pipeline_final.predict_proba(X))),
-        ("Candidato reconstruido sin caché = candidato guardado",
-         np.array_equal(produccion_desde_cero.predict_proba(X[cols_prod])[:, 1], prob_prod)),
-        ("El candidato no recibe gender ni contacts_count_12_mon",
-         not set(VARIABLES_EXCLUIDAS_PRODUCCION) & set(cols_prod)),
+        ("Modelo guardado = modelo evaluado en test (mismas predicciones en train)",
+         np.array_equal(modelo_cargado["pipeline"].predict_proba(X), pipeline_final.predict_proba(X))),
+        ("Modelo reconstruido sin caché = modelo evaluado en test",
+         np.array_equal(desde_cero.predict_proba(X), pipeline_final.predict_proba(X))),
         ("Clase positiva = Attrited Customer (código 1, columna de classes_)",
-         produccion_cargado["clase_positiva"] == config.CLASE_POSITIVA
-         and indice_clase_positiva(produccion_cargado["pipeline"]) == 1),
-        ("Huella de los datos de train igual en ambos modelos",
-         oficial_cargado["huella_datos_train"] == produccion_cargado["huella_datos_train"]),
-        ("Candidato marcado como no evaluado en test y sin métricas de test",
-         produccion_cargado["evaluado_en_test"] is False and not any("test" in k for k in produccion_cargado["metricas"])),
+         modelo_cargado["clase_positiva"] == config.CLASE_POSITIVA
+         and indice_clase_positiva(modelo_cargado["pipeline"]) == 1),
+        ("Huella de datos guardada = huella de los datos de train",
+         modelo_cargado["huella_datos_train"] == huella_datos(X[columnas_entrada()], y)),
     ], columns=["control", "cumple"])
 
 

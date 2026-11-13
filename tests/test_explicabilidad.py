@@ -95,10 +95,9 @@ def test_equidad_por_grupo_cuadra_con_el_escenario():
     assert tabla.loc["F", "captura_en_grupo"] == pytest.approx(2 / 3)
     assert tabla.loc["F", "precision_en_grupo"] == pytest.approx(2 / 3)
     assert np.isnan(tabla.loc["M", "captura_en_grupo"]) and np.isnan(tabla.loc["M", "precision_en_grupo"])
-    assert tabla.loc["F", "falsas_alarmas_en_grupo"] == pytest.approx(1 / 2)  # 1 de los 2 que no se iban
-    assert tabla.loc["M", "falsas_alarmas_en_grupo"] == 0
-    assert tabla.loc["F", "auc_en_grupo"] == pytest.approx(5 / 6)  # 5 de 6 pares bien ordenados
-    assert np.isnan(tabla.loc["M", "auc_en_grupo"])  # sin churners no hay AUC
+    assert tabla.loc["F", "churners"] == 3 and tabla.loc["M", "churners"] == 0
+    # contacto en proporción al riesgo: 60 % contactado frente a 60 % de churn real en F
+    assert tabla.loc["F", "razon_contacto_riesgo"] == pytest.approx((3 / 5) / (3 / 5))
 
 
 def test_seleccion_en_grupo():

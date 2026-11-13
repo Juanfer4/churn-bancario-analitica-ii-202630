@@ -80,3 +80,18 @@ def test_tabla_semaforos_lee_los_tres_indicadores_y_deja_pendiente_la_captura_si
     assert tabla.loc["corrido", "estado"] == "rojo" and tabla.loc["corrido", "variable con más PSI"] == "a"
     assert tabla.loc["estable", "estado captura"] in ("verde", "amarillo", "rojo")
     assert tabla.loc["corrido", "estado captura"].startswith("pendiente")
+
+
+def test_tabla_semaforos_usa_la_referencia_del_puntaje_que_se_le_entrega():
+    """Con clientes nuevos la referencia deben ser puntajes fuera de pliegue, no los de entrenamiento."""
+    from sklearn.linear_model import LogisticRegression
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=600), "b": rng.normal(size=600)})
+    y = pd.Series((X["a"] + rng.normal(scale=0.5, size=600) > 0).astype(int))
+    modelo = LogisticRegression().fit(X, y)
+    puntaje = modelo.predict_proba(X)[:, 1]
+    propia = monitoreo.tabla_semaforos(modelo, ["a", "b"], X, {"lote": X}, captura_base=0.9)
+    assert propia.loc["lote", "PSI puntaje"] == pytest.approx(0, abs=1e-9)  # mismo lote, misma referencia
+    otra = monitoreo.tabla_semaforos(modelo, ["a", "b"], X, {"lote": X}, captura_base=0.9,
+                                     puntaje_referencia=np.clip(puntaje * 0.5, 0, 1))  # referencia distinta
+    assert otra.loc["lote", "PSI puntaje"] > config.UMBRALES_MONITOREO["psi"][1]

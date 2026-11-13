@@ -1,4 +1,4 @@
-"""Cifras citadas en el texto del EDA (Fase 2, 2.2 a 2.9, del notebook).
+"""Cifras citadas en el texto del EDA (Fase 2, 2.1 a 2.8, del notebook).
 
 Recalcula cada número con pandas, scipy y sklearn directamente (sin churn.exploracion)
 y lo compara con el valor escrito en el markdown, a la precisión con la que se escribió.
@@ -152,7 +152,7 @@ def test_cifras_citadas_en_el_eda(cifras):
     ct = pd.crosstab(X["gender"], X["income_category"])
     chk("F>=60k", ct.loc["F", ["$60K - $80K", "$80K - $120K", "$120K +"]].sum(), 0, 0)
     chk("F unknown", 100 * ct.loc["F", "Unknown"] / ct["Unknown"].sum(), 95.03, .005)
-    # Identidad citada en 2.8 y 2.10
+    # Identidad citada en 2.1 y 2.2
     assert (X["credit_limit"] - X["total_revolving_bal"] - X["avg_open_to_buy"]).abs().max() < 1e-6
 
     cifras.verificar()
