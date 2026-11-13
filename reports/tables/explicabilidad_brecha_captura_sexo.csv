@@ -1,2 +1,2 @@
 comparacion,churners_F,churners_M,brecha_captura,ic95_inf,ic95_sup,incluye_cero
-F menos M,749,553,0.025097,0.007868,0.043655,False
+F menos M,749,553,0.020534,0.004343,0.037197,False

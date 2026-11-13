@@ -1,0 +1,4 @@
+combinacion,auc_cv,auc_cv_desv,diferencia_vs_referencia,diferencia_desv,pliegues_que_mejoran,churners_20
+LightGBM,0.994069,0.000887,0.0,0.0,0,1275
+Votación de finalistas,0.994003,0.001471,-6.6e-05,0.000632,3,1275
+Stacking de finalistas,0.993899,0.001472,-0.00017,0.000634,3,1276

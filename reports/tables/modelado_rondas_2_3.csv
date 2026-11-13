@@ -1,2 +1,0 @@
-modelo,auc_cv_anterior,auc_cv_nueva,cambio,desv_nueva,hiperparametros_anterior,hiperparametros_nueva
-Red neuronal (MLP),0.972544,0.972925,0.000381,0.00377,"{'alpha': 0.003, 'hidden_layer_sizes': (128, 64)}","{'alpha': 0.01, 'hidden_layer_sizes': (256, 128)}"

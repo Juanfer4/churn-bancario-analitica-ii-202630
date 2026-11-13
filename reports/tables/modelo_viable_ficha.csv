@@ -1,0 +1,20 @@
+,valor
+nombre,LightGBM (modelo oficial)
+rol,oficial
+evaluado_en_test,True
+variables_excluidas,[]
+clase_positiva,Attrited Customer
+semilla,42
+fecha_entrenamiento,2026-11-13
+n_columnas_entrada,14
+huella_datos_train,c1ece44024bf
+metrica__origen,"evaluación única en test, Fase 5 (5.1) del notebook (2.026 clientes)"
+metrica__auc_test,0.9930122552344774
+metrica__ap_test,0.96750620311477
+metrica__brier_test,0.0240802537765108
+version__python,3.11.9
+version__scikit-learn,1.4.2
+version__lightgbm,4.7.0
+version__imbalanced-learn,0.14.2
+version__pandas,2.1.4
+version__numpy,1.26.4

@@ -1,0 +1,16 @@
+tipo,variable
+HIGH_CORRELATION,avg_open_to_buy
+HIGH_CORRELATION,avg_utilization_ratio
+HIGH_CORRELATION,credit_limit
+HIGH_CORRELATION,customer_age
+HIGH_CORRELATION,gender
+HIGH_CORRELATION,income_category
+HIGH_CORRELATION,months_on_book
+HIGH_CORRELATION,total_revolving_bal
+HIGH_CORRELATION,total_trans_amt
+HIGH_CORRELATION,total_trans_ct
+IMBALANCE,card_category
+ZEROS,avg_utilization_ratio
+ZEROS,contacts_count_12_mon
+ZEROS,dependent_count
+ZEROS,total_revolving_bal

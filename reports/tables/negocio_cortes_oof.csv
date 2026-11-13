@@ -1,0 +1,4 @@
+capacidad,contactos_adicionales,churners_adicionales,precision_marginal,sr_minimo,r_minimo_ejemplo
+0.1,810,799,0.98642,1.013767,2.027534
+0.2,810,476,0.587654,1.701681,3.403361
+0.3,810,21,0.025926,38.571429,77.142857

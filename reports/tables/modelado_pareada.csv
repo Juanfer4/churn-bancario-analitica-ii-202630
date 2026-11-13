@@ -1,9 +1,11 @@
 modelo,diferencia_media,diferencia_desv,pliegues_por_debajo_del_mejor
 LightGBM,0.0,0.0,0
-XGBoost,-0.000587,0.000581,4
-Gradient Boosting,-0.000675,0.001067,4
-AdaBoost,-0.001406,0.00035,5
-Random Forest,-0.004228,0.001566,5
-SVM (kernel RBF),-0.018894,0.001951,5
-Red neuronal (MLP),-0.021223,0.003681,5
-Regresión logística,-0.043109,0.00211,5
+Gradient Boosting,-0.000478,0.000886,3
+XGBoost,-0.00049,0.000704,3
+AdaBoost,-0.001271,0.000685,5
+Red neuronal (MLP),-0.002777,0.001845,5
+Bagging de árboles,-0.003181,0.001407,5
+Random Forest,-0.003581,0.001559,5
+SVM,-0.015282,0.004675,5
+Árbol de decisión,-0.03187,0.004948,5
+Regresión logística,-0.04303,0.001824,5

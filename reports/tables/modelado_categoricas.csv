@@ -1,0 +1,11 @@
+modelo,auc_con_categoricas,auc_sin_categoricas,aporte_medio,aporte_desv,pliegues_en_que_aportan,aporte_claro
+Regresión logística,0.937708,0.936484,0.001224,0.001182,5,True
+SVM,0.967348,0.970457,-0.00311,0.001832,0,False
+Red neuronal (MLP),0.96349,0.959739,0.003751,0.015677,2,False
+Árbol de decisión,0.876078,0.886019,-0.009941,0.012994,2,False
+Bagging de árboles,0.984957,0.986072,-0.001116,0.001443,2,False
+Random Forest,0.987121,0.989679,-0.002558,0.001525,0,False
+AdaBoost,0.973985,0.974173,-0.000188,0.000376,0,False
+Gradient Boosting,0.990054,0.989878,0.000176,0.000383,3,False
+XGBoost,0.992231,0.992837,-0.000606,0.000923,1,False
+LightGBM,0.993067,0.993672,-0.000605,0.000886,2,False

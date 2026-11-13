@@ -1,5 +1,5 @@
 ,auc_cv,auc_test,diferencia_test_menos_cv
-LightGBM,0.994148,0.993336,-0.000812
-XGBoost,0.993561,0.993378,-0.000184
-Gradient Boosting,0.993473,0.992723,-0.000751
+LightGBM,0.994069,0.993012,-0.001057
+Gradient Boosting,0.993591,0.992527,-0.001064
+XGBoost,0.993579,0.992898,-0.00068
 Regresión logística,0.951039,0.944512,-0.006527

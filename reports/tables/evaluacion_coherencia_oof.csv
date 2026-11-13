@@ -1,0 +1,5 @@
+,auc_oof,auc_cv_medio
+LightGBM,0.994063,0.994069
+Gradient Boosting,0.993359,0.993591
+XGBoost,0.993539,0.993579
+Regresión logística,0.95085,0.951039
