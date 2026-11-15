@@ -12,7 +12,7 @@ Proyecto final del curso Métodos y Aplicaciones de Analítica II (Maestría en 
 │   └── processed/        Datos limpios generados por código (no se versionan)
 ├── docs/
 │   ├── oficial/          Enunciado oficial del caso
-│   ├── evidencia/        Captura de pytest (153 pruebas) y lista de la revisión externa con ChatGPT
+│   └── evidencia/        Captura de pytest (153 pruebas) y lista de la revisión externa con ChatGPT
 ├── src/churn/            Librería del proyecto: config, datos, exploracion, features, modelos, comparacion,
 │                         evaluacion, negocio, explicabilidad, produccion, monitoreo, reportes, gráficos
 │                         (graficos, graficos_modelado, graficos_negocio) y entorno (solo Windows)
